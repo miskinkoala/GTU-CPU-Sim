@@ -1,0 +1,22 @@
+#Program sample
+Begin Data Section
+0 0 #program counter
+1 0 # stack pointer
+2 0
+3 0
+4 0
+5 0
+...
+255 0
+End Data Section
+Begin Instruction Section
+0 SET 10 50 # i = 10
+1 SET 0 51 # sum = 0
+2 ADDI 50 51 # sum = sum + i
+3 ADD 50 -1 # i = i – 1
+4 JIF 50 7 # Go to 7 if i <= 0
+5 SYSCALL PRN 51 # print the sum so far, since this program does not have OS
+# This will be ignored
+6 SET 2 0 # Go to 2 – remember address 0 is the program counter
+7 HLT # end of program, the result is in memory address 51 (sum)
+End Instruction Section

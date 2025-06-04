@@ -1,0 +1,13 @@
+	BIOS
+
+	OS
+		-SCHEDULER
+		-
+
+
+	CPU
+
+	ISA
+
+	SIMULATION
+
