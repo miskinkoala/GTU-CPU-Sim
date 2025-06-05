@@ -1,4 +1,5 @@
 // TODO: change Mode struct to enum
+#include <stdio.h>
 
 // cpu.h starts
 #ifndef CPU_H
@@ -75,13 +76,27 @@ typedef struct
 } Instruction;
 
 /*
+Assembler
+*/
+void parse_program(FILE *file, int *instruction_count);
+
+/*
+Debug Funcs
+*/
+void print_memory_state(void);
+
+void print_thread_table(void);
+
+extern int debug_mode; // Declare debug_mode as extern
+
+/*
 CPU FUNTIONALTTIES
 */
-void init_cpu(const DATA *main_memory);
+void init_cpu();
 /*
 inilize gtu cpu with its starting values
 */
-void init_cpu_registers(const DATA *main_memory);
+void init_cpu_registers();
 /*
 assiign gtu cpu register to corresponding memory addresses 0-20
 */

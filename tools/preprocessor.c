@@ -1,3 +1,5 @@
+#define _POSIX_C_SOURCE 200809L // Enable POSIX functions
+#define _GNU_SOURCE             // Enable GNU extensions (includes POSIX)
 #include "preprocessor.h"
 
 void init_preprocessor(PreprocessorContext *ctx)
@@ -167,6 +169,9 @@ char *process_line(PreprocessorContext *ctx, const char *line, const char *filen
 
 int handle_directive(PreprocessorContext *ctx, const char *line, const char *filename, int line_num)
 {
+    (void)filename; // Suppress warning
+    (void)line_num; // Suppress warning
+
     char directive[64];
     char args[MAX_LINE_LENGTH];
 
@@ -370,7 +375,7 @@ char *expand_defines(PreprocessorContext *ctx, const char *line)
             while ((pos = strstr(pos, ctx->defines[i].name)) != NULL)
             {
                 // Check if it's a whole word
-                int start_ok = (pos == result || !isalnum(pos[-1]) && pos[-1] != '_');
+                int start_ok = (pos == result || (!isalnum(pos[-1]) && pos[-1] != '_'));
                 int end_ok = !isalnum(pos[strlen(ctx->defines[i].name)]) &&
                              pos[strlen(ctx->defines[i].name)] != '_';
 
@@ -402,7 +407,8 @@ char *expand_defines(PreprocessorContext *ctx, const char *line)
     return result;
 }
 
-char *expand_macros(PreprocessorContext *ctx, const char *line)
+char *expand_macros(__attribute__((unused)) PreprocessorContext *ctx,
+                    const char *line)
 {
     // For now, just return a copy since we don't have complex macros
     // This can be extended to handle parameterized macros

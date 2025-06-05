@@ -13,6 +13,7 @@
 Instruction INST_MEMORY[INST_MEMORY_CAPACITY];
 DATA DATA_MEMORY[DATA_MEMORY_CAPACITY];
 CPU gtu_cpu;
+int debug_mode = 0;
 
 // Jump table for instruction handlers
 typedef void (*instruction_handler_t)(WORD *, int);
@@ -89,12 +90,12 @@ void handle_call(WORD *operands, int num_ops)
         CALL(operands[0]);
 }
 
-void handle_ret(WORD *operands, int num_ops)
+void handle_ret()
 {
     RET();
 }
 
-void handle_hlt(WORD *operands, int num_ops)
+void handle_hlt()
 {
     HLT();
 }
@@ -111,12 +112,12 @@ void handle_syscall_prn(WORD *operands, int num_ops)
         SYSCALL_PRN(operands[0]);
 }
 
-void handle_syscall_hlt(WORD *operands, int num_ops)
+void handle_syscall_hlt()
 {
     SYSCALL_HLT();
 }
 
-void handle_syscall_yield(WORD *operands, int num_ops)
+void handle_syscall_yield()
 {
     SYSCALL_YIELD();
 }
@@ -180,19 +181,19 @@ opcode_t string_to_opcode(const char *opcode_str)
 // helper functions
 int is_valid_memory_address(MEM_LOCATION addr);
 void parse_program(FILE *file, int *instruction_count);
-int can_access_memory(CPU *cpu, MEM_LOCATION addr);
+int can_access_memory(MEM_LOCATION addr);
 
 /*
 CPU FUNCTIONALITIES
 */
-void init_cpu(const DATA *main_memory)
+void init_cpu()
 {
     // CPU cpu;
     gtu_cpu.mode.mode = 'K'; // Start in kernel mode
     gtu_cpu.halted = 0;
 
     // Initialize register pointers
-    init_cpu_registers(main_memory);
+    init_cpu_registers();
 
     // Set initial register values
     CPU_PC(&gtu_cpu) = 0;          // Program Counter starts at 0
@@ -201,7 +202,7 @@ void init_cpu(const DATA *main_memory)
     CPU_INSTR_COUNT(&gtu_cpu) = 0; // Instruction count
 }
 
-void init_cpu_registers(const DATA *main_memory)
+void init_cpu_registers()
 {
     for (int i = 0; i < REGISTER_NUMBER; i++)
     {
@@ -229,7 +230,7 @@ void execute_instruction()
     printf("PC: %ld", current_pc);
 
     // Bounds check
-    if (current_pc < 0 || current_pc >= INST_MEMORY_CAPACITY)
+    if (current_pc >= INST_MEMORY_CAPACITY)
     {
         printf("Error: PC out of bounds: %ld\n", current_pc);
         gtu_cpu.halted = 1;
@@ -299,11 +300,11 @@ int main(int argc, char *argv[])
 */
 int is_valid_memory_address(MEM_LOCATION addr)
 {
-    return (addr >= 0 && addr < DATA_MEMORY_CAPACITY);
+    return (addr < DATA_MEMORY_CAPACITY);
 }
 
 // Helper function to check user mode memory access
-int can_access_memory(CPU *cpu, MEM_LOCATION addr)
+int can_access_memory(MEM_LOCATION addr)
 {
     if (gtu_cpu.mode.mode == 'K')
     {
@@ -538,224 +539,37 @@ void parse_program(FILE *file, int *instruction_count)
     printf("Parsing complete. Loaded %d instructions.\n", *instruction_count);
 }
 
-void parse_program_old_old(FILE *file, Instruction *instructions, int *instruction_count)
+void print_memory_state()
 {
-    char line[256];
-    int parsing_data = 0;
-    int parsing_instructions = 0;
-    *instruction_count = 0;
-
-    /*
-    // Initialize instruction memory - mark all as invalid
-    for (int i = 0; i < INST_MEMORY_CAPACITY; i++)
-    {
-        instructions[i].opcode = OP_UNKNOWN;
-        instructions[i].num_operands = 0;
-        strcpy(instructions[i].opcode_str, "INVALID");
-        printf("%d instruction: %s %d\n", i, instructions[i].opcode_str, instructions[i].opcode);
-    }
-    */
-
-    while (fgets(line, sizeof(line), file))
-    {
-        // Skip empty lines and comments
-        if (line[0] == '#' || line[0] == '\n' || strlen(line) == 0)
+    fprintf(stderr, "=== Memory State ===\n");
+    for (int i = 0; i < 100; i++)
+    { // Print first 100 memory locations
+        if (DATA_MEMORY[i]._sli != 0)
         {
-            continue;
-        }
-
-        // Check for section markers
-        if (strstr(line, "Begin Data Section"))
-        {
-            parsing_data = 1;
-            parsing_instructions = 0;
-            printf("Starting data section parsing...\n");
-            continue;
-        }
-        else if (strstr(line, "End Data Section"))
-        {
-            parsing_data = 0;
-            printf("Finished data section parsing.\n");
-            continue;
-        }
-        else if (strstr(line, "Begin Instruction Section"))
-        {
-            parsing_instructions = 1;
-            parsing_data = 0;
-            printf("Starting instruction section parsing...\n");
-            continue;
-        }
-        else if (strstr(line, "End Instruction Section"))
-        {
-            parsing_instructions = 0;
-            printf("Finished instruction section parsing.\n");
-            break;
-        }
-
-        // Parse data section (unchanged)
-        if (parsing_data)
-        {
-            int address;
-            long value;
-            if (sscanf(line, "%d %ld", &address, &value) == 2)
-            {
-                if (address >= 0 && address < DATA_MEMORY_CAPACITY)
-                {
-                    DATA_MEMORY[address]._sli = value;
-                    printf("Loaded data: DATA_MEMORY[%d]._sli = %ld\n", address, value);
-                }
-                else
-                {
-                    printf("Warning: Data address %d out of bounds, skipping.\n", address);
-                }
-            }
-            else
-            {
-                printf("Warning: Could not parse data line: %s", line);
-            }
-        }
-
-        // Parse instruction section - FIXED: Store by address, not by count
-        if (parsing_instructions)
-        {
-            int addr;
-            char op[16];
-            long op1, op2;
-
-            // Check if instruction address is valid
-            if (addr < 0 || addr >= INST_MEMORY_CAPACITY)
-            {
-                printf("Error: Instruction address %d out of bounds, skipping.\n", addr);
-                continue;
-            }
-
-            // Special handling for SYSCALL instructions
-            if (strstr(line, "SYSCALL"))
-            {
-                // Parse SYSCALL instructions with custom logic
-                if (strstr(line, "SYSCALL PRN"))
-                {
-                    long operand;
-                    if (sscanf(line, "%d SYSCALL PRN %ld", &addr, &operand) == 2)
-                    {
-                        // FIXED: Store at actual address, not instruction_count
-                        instructions[addr].opcode = OP_SYSCALL_PRN;
-                        strncpy(instructions[addr].opcode_str, "SYSCALL PRN",
-                                sizeof(instructions[addr].opcode_str) - 1);
-                        instructions[addr].opcode_str[sizeof(instructions[addr].opcode_str) - 1] = '\0';
-                        instructions[addr].operands[0] = operand;
-                        instructions[addr].num_operands = 1;
-
-                        printf("Parsed instruction %d: SYSCALL PRN (enum: %d) %ld\n",
-                               addr, instructions[addr].opcode, operand);
-                        (*instruction_count)++;
-                    }
-                    else
-                    {
-                        printf("Warning: Could not parse SYSCALL PRN line: %s", line);
-                        continue;
-                    }
-                }
-                else if (strstr(line, "SYSCALL HLT"))
-                {
-                    if (sscanf(line, "%d SYSCALL HLT", &addr) == 1)
-                    {
-                        // FIXED: Store at actual address
-                        instructions[addr].opcode = OP_SYSCALL_HLT;
-                        strncpy(instructions[addr].opcode_str, "SYSCALL HLT",
-                                sizeof(instructions[addr].opcode_str) - 1);
-                        instructions[addr].opcode_str[sizeof(instructions[addr].opcode_str) - 1] = '\0';
-                        instructions[addr].num_operands = 0;
-
-                        printf("Parsed instruction %d: SYSCALL HLT (enum: %d)\n",
-                               addr, instructions[addr].opcode);
-                        (*instruction_count)++;
-                    }
-                    else
-                    {
-                        printf("Warning: Could not parse SYSCALL HLT line: %s", line);
-                        continue;
-                    }
-                }
-                else if (strstr(line, "SYSCALL YIELD"))
-                {
-                    if (sscanf(line, "%d SYSCALL YIELD", &addr) == 1)
-                    {
-                        // FIXED: Store at actual address
-                        instructions[addr].opcode = OP_SYSCALL_YIELD;
-                        strncpy(instructions[addr].opcode_str, "SYSCALL YIELD",
-                                sizeof(instructions[addr].opcode_str) - 1);
-                        instructions[addr].opcode_str[sizeof(instructions[addr].opcode_str) - 1] = '\0';
-                        instructions[addr].num_operands = 0;
-
-                        printf("Parsed instruction %d: SYSCALL YIELD (enum: %d)\n",
-                               addr, instructions[addr].opcode);
-                        (*instruction_count)++;
-                    }
-                    else
-                    {
-                        printf("Warning: Could not parse SYSCALL YIELD line: %s", line);
-                        continue;
-                    }
-                }
-                else
-                {
-                    printf("Warning: Unknown SYSCALL format: %s", line);
-                    continue;
-                }
-            }
-            else
-            {
-                // Handle regular instructions (non-SYSCALL)
-                int parsed = sscanf(line, "%d %s %ld %ld", &addr, op, &op1, &op2);
-
-                if (parsed >= 2)
-                {
-                    // FIXED: Store at actual address, not instruction_count
-                    instructions[addr].opcode = string_to_opcode(op);
-
-                    // Safe string copy with bounds checking
-                    strncpy(instructions[addr].opcode_str, op,
-                            sizeof(instructions[addr].opcode_str) - 1);
-                    instructions[addr].opcode_str[sizeof(instructions[addr].opcode_str) - 1] = '\0';
-
-                    instructions[addr].num_operands = parsed - 2;
-
-                    // Handle operands based on number parsed
-                    if (parsed >= 3)
-                    {
-                        instructions[addr].operands[0] = op1;
-                    }
-                    if (parsed >= 4)
-                    {
-                        instructions[addr].operands[1] = op2;
-                    }
-
-                    printf("Parsed instruction %d: %s (enum: %d)", addr, op, instructions[addr].opcode);
-                    for (int i = 0; i < instructions[addr].num_operands; i++)
-                    {
-                        printf(" %ld", instructions[addr].operands[i]);
-                    }
-                    printf("\n");
-
-                    (*instruction_count)++;
-                }
-                else
-                {
-                    printf("Warning: Could not parse instruction line: %s", line);
-                }
-            }
+            fprintf(stderr, "MEMORY[%d] = %ld\n", i, DATA_MEMORY[i]._sli);
         }
     }
+    fprintf(stderr, "==================\n");
+}
 
-    printf("Parsing complete. Loaded %d instructions.\n", *instruction_count);
+void print_thread_table()
+{
+    fprintf(stderr, "=== Thread Table ===\n");
+    for (int i = 0; i < 4; i++)
+    { // Print first 4 threads
+        int base = 40 + i * 10;
+        fprintf(stderr, "Thread %d: ID=%ld, State=%ld, PC=%ld, SP=%ld\n",
+                i, DATA_MEMORY[base]._sli, DATA_MEMORY[base + 3]._sli,
+                DATA_MEMORY[base + 4]._sli, DATA_MEMORY[base + 5]._sli);
+    }
+    fprintf(stderr, "===================\n");
 }
 
 // ISA function implementations
 
 void SET(const CONSTANT B, MEM_LOCATION A)
 {
-    if (!can_access_memory(&gtu_cpu, A))
+    if (!can_access_memory(A))
     {
         printf("Memory access violation at address %lu\n", A);
         if (gtu_cpu.mode.mode == 'U')
@@ -771,7 +585,7 @@ void SET(const CONSTANT B, MEM_LOCATION A)
 
 void CPY(const MEM_LOCATION A1, MEM_LOCATION A2)
 {
-    if (!can_access_memory(&gtu_cpu, A1) || !can_access_memory(&gtu_cpu, A2))
+    if (!can_access_memory(A1) || !can_access_memory(A2))
     {
         printf("Memory access violation\n");
         if (gtu_cpu.mode.mode == 'U')
@@ -787,7 +601,7 @@ void CPY(const MEM_LOCATION A1, MEM_LOCATION A2)
 
 void CPYI(const MEM_LOCATION A1, MEM_LOCATION A2)
 {
-    if (!can_access_memory(&gtu_cpu, A1) || !can_access_memory(&gtu_cpu, A2))
+    if (!can_access_memory(A1) || !can_access_memory(A2))
     {
         printf("Memory access violation\n");
         if (gtu_cpu.mode.mode == 'U')
@@ -798,7 +612,7 @@ void CPYI(const MEM_LOCATION A1, MEM_LOCATION A2)
     }
 
     MEM_LOCATION indirect_addr = DATA_MEMORY[A1]._sli;
-    if (!can_access_memory(&gtu_cpu, indirect_addr))
+    if (!can_access_memory(indirect_addr))
     {
         printf("Indirect memory access violation at address %lu\n", indirect_addr);
         if (gtu_cpu.mode.mode == 'U')
@@ -815,7 +629,7 @@ void CPYI(const MEM_LOCATION A1, MEM_LOCATION A2)
 void CPYI2(MEM_LOCATION A1, MEM_LOCATION A2)
 {
     // Check if we can access the initial memory locations A1 and A2
-    if (!can_access_memory(&gtu_cpu, A1) || !can_access_memory(&gtu_cpu, A2))
+    if (!can_access_memory(A1) || !can_access_memory(A2))
     {
         printf("Memory access violation at initial addresses A1=%lu or A2=%lu\n", A1, A2);
         if (gtu_cpu.mode.mode == 'U')
@@ -830,7 +644,7 @@ void CPYI2(MEM_LOCATION A1, MEM_LOCATION A2)
     MEM_LOCATION dest_addr = DATA_MEMORY[A2]._sli;   // Address stored in A2
 
     // Check if we can access both indirect addresses
-    if (!can_access_memory(&gtu_cpu, source_addr))
+    if (!can_access_memory(source_addr))
     {
         printf("Indirect source memory access violation at address %lu (from A1=%lu)\n", source_addr, A1);
         if (gtu_cpu.mode.mode == 'U')
@@ -840,7 +654,7 @@ void CPYI2(MEM_LOCATION A1, MEM_LOCATION A2)
         return;
     }
 
-    if (!can_access_memory(&gtu_cpu, dest_addr))
+    if (!can_access_memory(dest_addr))
     {
         printf("Indirect destination memory access violation at address %lu (from A2=%lu)\n", dest_addr, A2);
         if (gtu_cpu.mode.mode == 'U')
@@ -861,7 +675,7 @@ void CPYI2(MEM_LOCATION A1, MEM_LOCATION A2)
 
 void ADD(MEM_LOCATION A, CONSTANT B)
 {
-    if (!can_access_memory(&gtu_cpu, A))
+    if (!can_access_memory(A))
     {
         printf("Memory access violation at address %lu\n", A);
         if (gtu_cpu.mode.mode == 'U')
@@ -877,7 +691,7 @@ void ADD(MEM_LOCATION A, CONSTANT B)
 
 void ADDI(MEM_LOCATION A1, MEM_LOCATION A2)
 {
-    if (!can_access_memory(&gtu_cpu, A1) || !can_access_memory(&gtu_cpu, A2))
+    if (!can_access_memory(A1) || !can_access_memory(A2))
     {
         printf("Memory access violation\n");
         if (gtu_cpu.mode.mode == 'U')
@@ -893,7 +707,7 @@ void ADDI(MEM_LOCATION A1, MEM_LOCATION A2)
 
 void SUBI(const MEM_LOCATION A1, MEM_LOCATION A2)
 {
-    if (!can_access_memory(&gtu_cpu, A1) || !can_access_memory(&gtu_cpu, A2))
+    if (!can_access_memory(A1) || !can_access_memory(A2))
     {
         printf("Memory access violation\n");
         if (gtu_cpu.mode.mode == 'U')
@@ -910,7 +724,7 @@ void SUBI(const MEM_LOCATION A1, MEM_LOCATION A2)
 
 void JIF(MEM_LOCATION A, INSTR_ADDR C)
 {
-    if (!can_access_memory(&gtu_cpu, A))
+    if (!can_access_memory(A))
     {
         printf("Memory access violation at address %lu\n", A);
         if (gtu_cpu.mode.mode == 'U')
@@ -939,7 +753,7 @@ void JIF(MEM_LOCATION A, INSTR_ADDR C)
 
 void PUSH(const MEM_LOCATION A)
 {
-    if (!can_access_memory(&gtu_cpu, A))
+    if (!can_access_memory(A))
     {
         printf("Memory access violation at address %lu\n", A);
         if (gtu_cpu.mode.mode == 'U')
@@ -952,7 +766,7 @@ void PUSH(const MEM_LOCATION A)
     CPU_SP(&gtu_cpu)
     --;
 
-    if (!can_access_memory(&gtu_cpu, CPU_SP(&gtu_cpu)))
+    if (!can_access_memory(CPU_SP(&gtu_cpu)))
     {
         printf("Stack overflow\n");
         gtu_cpu.halted = 1;
@@ -965,7 +779,7 @@ void PUSH(const MEM_LOCATION A)
 
 void POP(MEM_LOCATION A)
 {
-    if (!can_access_memory(&gtu_cpu, A))
+    if (!can_access_memory(A))
     {
         printf("Memory access violation at address %lu\n", A);
         if (gtu_cpu.mode.mode == 'U')
@@ -975,7 +789,7 @@ void POP(MEM_LOCATION A)
         return;
     }
 
-    if (!can_access_memory(&gtu_cpu, CPU_SP(&gtu_cpu)))
+    if (!can_access_memory(CPU_SP(&gtu_cpu)))
     {
         printf("Stack underflow\n");
         gtu_cpu.halted = 1;
@@ -995,7 +809,7 @@ void CALL(INSTR_ADDR C)
     CPU_SP(&gtu_cpu)
     --;
 
-    if (!can_access_memory(&gtu_cpu, CPU_SP(&gtu_cpu)))
+    if (!can_access_memory(CPU_SP(&gtu_cpu)))
     {
         printf("Stack overflow during CALL\n");
         gtu_cpu.halted = 1;
@@ -1012,7 +826,7 @@ void CALL(INSTR_ADDR C)
 
 void RET()
 {
-    if (!can_access_memory(&gtu_cpu, CPU_SP(&gtu_cpu)))
+    if (!can_access_memory(CPU_SP(&gtu_cpu)))
     {
         printf("Stack underflow during RET\n");
         gtu_cpu.halted = 1;
@@ -1035,7 +849,7 @@ void HLT()
 
 void USER(MEM_LOCATION A)
 {
-    if (!can_access_memory(&gtu_cpu, A))
+    if (!can_access_memory(A))
     {
         printf("Memory access violation at address %lu\n", A);
         return;
@@ -1050,7 +864,6 @@ void USER(MEM_LOCATION A)
 void SYSCALL_PRN(MEM_LOCATION A)
 {
     // Automatically switch to kernel mode
-    char old_mode = gtu_cpu.mode.mode;
     gtu_cpu.mode.mode = 'K';
 
     if (!is_valid_memory_address(A))
