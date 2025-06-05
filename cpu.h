@@ -90,7 +90,7 @@ void changeMode();
 /*
 change cpu's mode
 */
-void execute_instruction(Instruction *instr);
+void execute_instruction();
 /*
 execute given instruciton
 */

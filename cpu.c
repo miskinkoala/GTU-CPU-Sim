@@ -1,3 +1,4 @@
+// TODO: CALL function does not work as intended
 
 // CUSTOM headers
 #include "cpu.h" //ISA, CPU, Memory arctectures
@@ -178,7 +179,7 @@ opcode_t string_to_opcode(const char *opcode_str)
 
 // helper functions
 int is_valid_memory_address(MEM_LOCATION addr);
-void parse_program(FILE *file, Instruction *instructions, int *instruction_count);
+void parse_program(FILE *file, int *instruction_count);
 int can_access_memory(CPU *cpu, MEM_LOCATION addr);
 
 /*
@@ -222,54 +223,74 @@ void changeMode()
     }
 }
 
-void execute_instruction(Instruction *instra)
+void execute_instruction()
 {
-    Instruction instr = instra[CPU_PC(&gtu_cpu)];
-    printf("Executing: %s", instr.opcode_str);
-    // printf(" %d", instr.num_operands);
-    for (int i = 0; i < instr.num_operands; i++)
+    INSTR_ADDR current_pc = CPU_PC(&gtu_cpu);
+    printf("PC: %ld", current_pc);
+
+    // Bounds check
+    if (current_pc < 0 || current_pc >= INST_MEMORY_CAPACITY)
     {
-        printf(" %ld", instr.operands[i]);
+        printf("Error: PC out of bounds: %ld\n", current_pc);
+        gtu_cpu.halted = 1;
+        return;
+    }
+
+    // FIXED: Direct access by PC address
+    Instruction *current_instr = &INST_MEMORY[current_pc];
+
+    // Check if instruction exists at this address
+    if (current_instr->opcode == OP_UNKNOWN)
+    {
+        printf("Error: No instruction at PC %ld\n", current_pc);
+        gtu_cpu.halted = 1;
+        return;
+    }
+
+    // Store current PC to detect if instruction modified it
+    WORD old_pc = current_pc;
+
+    printf("Executing: %s", current_instr->opcode_str);
+    for (int i = 0; i < current_instr->num_operands; i++)
+    {
+        printf(" %ld", current_instr->operands[i]);
     }
     printf("\n");
 
-    PROGRAM_COUNTER old_pc = CPU_PC(&gtu_cpu);
-
-    // Use jump table for O(1) instruction dispatch
-    if (instr.opcode < OP_UNKNOWN && instruction_handlers[instr.opcode] != NULL)
+    // Execute the instruction
+    if (current_instr->opcode < OP_UNKNOWN && instruction_handlers[current_instr->opcode] != NULL)
     {
-        instruction_handlers[instr.opcode](instr.operands, instr.num_operands);
-    }
-    else
-    {
-        printf("Unknown or unimplemented instruction: %s\n", instr.opcode_str);
+        instruction_handlers[current_instr->opcode](current_instr->operands, current_instr->num_operands);
     }
 
-    // Increment instruction count
-    ++CPU_INSTR_COUNT(&gtu_cpu);
+    // Only increment PC if instruction didn't modify it
     if (CPU_PC(&gtu_cpu) == old_pc)
     {
         CPU_PC(&gtu_cpu)
         ++;
     }
+
+    CPU_INSTR_COUNT(&gtu_cpu)
+    ++;
 }
+
 int main(int argc, char *argv[])
 {
     init_cpu(DATA_MEMORY);
-    FILE *fp = fopen("programs/sample_program", "r");
+    FILE *fp = fopen("programs/partition_OS_only", "r");
 
     if (fp == NULL)
     {
         printf("file could not be opended\n");
         return -1;
     }
-    Instruction instructions[1024];
+    // Instruction instructions[1024];
     int instruction_count = 0;
-    parse_program(fp, instructions, &instruction_count);
+    parse_program(fp, &instruction_count);
 
     while (!gtu_cpu.halted)
     {
-        execute_instruction(instructions);
+        execute_instruction();
     }
 
     fclose(fp);
@@ -295,12 +316,20 @@ int can_access_memory(CPU *cpu, MEM_LOCATION addr)
 
 // loader
 
-void parse_program(FILE *file, Instruction *instructions, int *instruction_count)
+void parse_program(FILE *file, int *instruction_count)
 {
     char line[256];
     int parsing_data = 0;
     int parsing_instructions = 0;
     *instruction_count = 0;
+
+    // Initialize instruction memory - mark all as invalid
+    for (int i = 0; i < INST_MEMORY_CAPACITY; i++)
+    {
+        INST_MEMORY[i].opcode = OP_UNKNOWN;
+        INST_MEMORY[i].num_operands = 0;
+        strcpy(INST_MEMORY[i].opcode_str, "INVALID");
+    }
 
     while (fgets(line, sizeof(line), file))
     {
@@ -348,6 +377,230 @@ void parse_program(FILE *file, Instruction *instructions, int *instruction_count
                 if (address >= 0 && address < DATA_MEMORY_CAPACITY)
                 {
                     DATA_MEMORY[address]._sli = value;
+                    printf("Loaded data: DATA_MEMORY[%d] = %ld\n", address, value);
+                }
+                else
+                {
+                    printf("Warning: Data address %d out of bounds, skipping.\n", address);
+                }
+            }
+            else
+            {
+                printf("Warning: Could not parse data line: %s", line);
+            }
+        }
+
+        // Parse instruction section - FIXED: Parse first, then validate
+        if (parsing_instructions)
+        {
+            int addr = -1; // Initialize to invalid value
+            char op[16];
+            long op1, op2;
+
+            // Special handling for SYSCALL instructions
+            if (strstr(line, "SYSCALL"))
+            {
+                if (strstr(line, "SYSCALL PRN"))
+                {
+                    long operand;
+                    // PARSE FIRST, then validate
+                    int parsed = sscanf(line, "%d SYSCALL PRN %ld", &addr, &operand);
+                    if (parsed != 2)
+                    {
+                        printf("Warning: Could not parse SYSCALL PRN line: %s", line);
+                        continue;
+                    }
+
+                    // NOW check bounds after successful parsing
+                    if (addr < 0 || addr >= INST_MEMORY_CAPACITY)
+                    {
+                        printf("Error: Instruction address %d out of bounds, skipping.\n", addr);
+                        continue;
+                    }
+
+                    INST_MEMORY[addr].opcode = OP_SYSCALL_PRN;
+                    strncpy(INST_MEMORY[addr].opcode_str, "SYSCALL PRN",
+                            sizeof(INST_MEMORY[addr].opcode_str) - 1);
+                    INST_MEMORY[addr].opcode_str[sizeof(INST_MEMORY[addr].opcode_str) - 1] = '\0';
+                    INST_MEMORY[addr].operands[0] = operand;
+                    INST_MEMORY[addr].num_operands = 1;
+
+                    printf("Parsed instruction %d: SYSCALL PRN (enum: %d) %ld\n",
+                           addr, INST_MEMORY[addr].opcode, operand);
+                    (*instruction_count)++;
+                }
+                else if (strstr(line, "SYSCALL HLT"))
+                {
+                    // PARSE FIRST, then validate
+                    int parsed = sscanf(line, "%d SYSCALL HLT", &addr);
+                    if (parsed != 1)
+                    {
+                        printf("Warning: Could not parse SYSCALL HLT line: %s", line);
+                        continue;
+                    }
+
+                    if (addr < 0 || addr >= INST_MEMORY_CAPACITY)
+                    {
+                        printf("Error: Instruction address %d out of bounds, skipping.\n", addr);
+                        continue;
+                    }
+
+                    INST_MEMORY[addr].opcode = OP_SYSCALL_HLT;
+                    strncpy(INST_MEMORY[addr].opcode_str, "SYSCALL HLT",
+                            sizeof(INST_MEMORY[addr].opcode_str) - 1);
+                    INST_MEMORY[addr].opcode_str[sizeof(INST_MEMORY[addr].opcode_str) - 1] = '\0';
+                    INST_MEMORY[addr].num_operands = 0;
+
+                    printf("Parsed instruction %d: SYSCALL HLT (enum: %d)\n",
+                           addr, INST_MEMORY[addr].opcode);
+                    (*instruction_count)++;
+                }
+                else if (strstr(line, "SYSCALL YIELD"))
+                {
+                    // PARSE FIRST, then validate
+                    int parsed = sscanf(line, "%d SYSCALL YIELD", &addr);
+                    if (parsed != 1)
+                    {
+                        printf("Warning: Could not parse SYSCALL YIELD line: %s", line);
+                        continue;
+                    }
+
+                    if (addr < 0 || addr >= INST_MEMORY_CAPACITY)
+                    {
+                        printf("Error: Instruction address %d out of bounds, skipping.\n", addr);
+                        continue;
+                    }
+
+                    INST_MEMORY[addr].opcode = OP_SYSCALL_YIELD;
+                    strncpy(INST_MEMORY[addr].opcode_str, "SYSCALL YIELD",
+                            sizeof(INST_MEMORY[addr].opcode_str) - 1);
+                    INST_MEMORY[addr].opcode_str[sizeof(INST_MEMORY[addr].opcode_str) - 1] = '\0';
+                    INST_MEMORY[addr].num_operands = 0;
+
+                    printf("Parsed instruction %d: SYSCALL YIELD (enum: %d)\n",
+                           addr, INST_MEMORY[addr].opcode);
+                    (*instruction_count)++;
+                }
+                else
+                {
+                    printf("Warning: Unknown SYSCALL format: %s", line);
+                    continue;
+                }
+            }
+            else
+            {
+                // Handle regular instructions (non-SYSCALL)
+                // PARSE FIRST, then validate
+                int parsed = sscanf(line, "%d %s %ld %ld", &addr, op, &op1, &op2);
+
+                if (parsed < 2)
+                {
+                    printf("Warning: Could not parse instruction line: %s", line);
+                    continue;
+                }
+
+                // NOW check bounds after successful parsing
+                if (addr < 0 || addr >= INST_MEMORY_CAPACITY)
+                {
+                    printf("Error: Instruction address %d out of bounds, skipping.\n", addr);
+                    continue;
+                }
+
+                INST_MEMORY[addr].opcode = string_to_opcode(op);
+                strncpy(INST_MEMORY[addr].opcode_str, op,
+                        sizeof(INST_MEMORY[addr].opcode_str) - 1);
+                INST_MEMORY[addr].opcode_str[sizeof(INST_MEMORY[addr].opcode_str) - 1] = '\0';
+
+                INST_MEMORY[addr].num_operands = parsed - 2;
+
+                if (parsed >= 3)
+                {
+                    INST_MEMORY[addr].operands[0] = op1;
+                }
+                if (parsed >= 4)
+                {
+                    INST_MEMORY[addr].operands[1] = op2;
+                }
+
+                printf("Parsed instruction %d: %s (enum: %d)", addr, op, INST_MEMORY[addr].opcode);
+                for (int i = 0; i < INST_MEMORY[addr].num_operands; i++)
+                {
+                    printf(" %ld", INST_MEMORY[addr].operands[i]);
+                }
+                printf("\n");
+
+                (*instruction_count)++;
+            }
+        }
+    }
+
+    printf("Parsing complete. Loaded %d instructions.\n", *instruction_count);
+}
+
+void parse_program_old_old(FILE *file, Instruction *instructions, int *instruction_count)
+{
+    char line[256];
+    int parsing_data = 0;
+    int parsing_instructions = 0;
+    *instruction_count = 0;
+
+    /*
+    // Initialize instruction memory - mark all as invalid
+    for (int i = 0; i < INST_MEMORY_CAPACITY; i++)
+    {
+        instructions[i].opcode = OP_UNKNOWN;
+        instructions[i].num_operands = 0;
+        strcpy(instructions[i].opcode_str, "INVALID");
+        printf("%d instruction: %s %d\n", i, instructions[i].opcode_str, instructions[i].opcode);
+    }
+    */
+
+    while (fgets(line, sizeof(line), file))
+    {
+        // Skip empty lines and comments
+        if (line[0] == '#' || line[0] == '\n' || strlen(line) == 0)
+        {
+            continue;
+        }
+
+        // Check for section markers
+        if (strstr(line, "Begin Data Section"))
+        {
+            parsing_data = 1;
+            parsing_instructions = 0;
+            printf("Starting data section parsing...\n");
+            continue;
+        }
+        else if (strstr(line, "End Data Section"))
+        {
+            parsing_data = 0;
+            printf("Finished data section parsing.\n");
+            continue;
+        }
+        else if (strstr(line, "Begin Instruction Section"))
+        {
+            parsing_instructions = 1;
+            parsing_data = 0;
+            printf("Starting instruction section parsing...\n");
+            continue;
+        }
+        else if (strstr(line, "End Instruction Section"))
+        {
+            parsing_instructions = 0;
+            printf("Finished instruction section parsing.\n");
+            break;
+        }
+
+        // Parse data section (unchanged)
+        if (parsing_data)
+        {
+            int address;
+            long value;
+            if (sscanf(line, "%d %ld", &address, &value) == 2)
+            {
+                if (address >= 0 && address < DATA_MEMORY_CAPACITY)
+                {
+                    DATA_MEMORY[address]._sli = value;
                     printf("Loaded data: DATA_MEMORY[%d]._sli = %ld\n", address, value);
                 }
                 else
@@ -361,18 +614,18 @@ void parse_program(FILE *file, Instruction *instructions, int *instruction_count
             }
         }
 
-        // Parse instruction section
+        // Parse instruction section - FIXED: Store by address, not by count
         if (parsing_instructions)
         {
             int addr;
             char op[16];
             long op1, op2;
 
-            // Check if we have space for more instructions
-            if (*instruction_count >= INST_MEMORY_CAPACITY)
+            // Check if instruction address is valid
+            if (addr < 0 || addr >= INST_MEMORY_CAPACITY)
             {
-                printf("Error: Too many instructions, exceeding capacity.\n");
-                break;
+                printf("Error: Instruction address %d out of bounds, skipping.\n", addr);
+                continue;
             }
 
             // Special handling for SYSCALL instructions
@@ -381,19 +634,20 @@ void parse_program(FILE *file, Instruction *instructions, int *instruction_count
                 // Parse SYSCALL instructions with custom logic
                 if (strstr(line, "SYSCALL PRN"))
                 {
-                    // SYSCALL PRN A format
                     long operand;
                     if (sscanf(line, "%d SYSCALL PRN %ld", &addr, &operand) == 2)
                     {
-                        instructions[*instruction_count].opcode = OP_SYSCALL_PRN;
-                        strncpy(instructions[*instruction_count].opcode_str, "SYSCALL PRN",
-                                sizeof(instructions[*instruction_count].opcode_str) - 1);
-                        instructions[*instruction_count].opcode_str[sizeof(instructions[*instruction_count].opcode_str) - 1] = '\0';
-                        instructions[*instruction_count].operands[0] = operand;
-                        instructions[*instruction_count].num_operands = 1;
+                        // FIXED: Store at actual address, not instruction_count
+                        instructions[addr].opcode = OP_SYSCALL_PRN;
+                        strncpy(instructions[addr].opcode_str, "SYSCALL PRN",
+                                sizeof(instructions[addr].opcode_str) - 1);
+                        instructions[addr].opcode_str[sizeof(instructions[addr].opcode_str) - 1] = '\0';
+                        instructions[addr].operands[0] = operand;
+                        instructions[addr].num_operands = 1;
 
                         printf("Parsed instruction %d: SYSCALL PRN (enum: %d) %ld\n",
-                               addr, instructions[*instruction_count].opcode, operand);
+                               addr, instructions[addr].opcode, operand);
+                        (*instruction_count)++;
                     }
                     else
                     {
@@ -403,17 +657,18 @@ void parse_program(FILE *file, Instruction *instructions, int *instruction_count
                 }
                 else if (strstr(line, "SYSCALL HLT"))
                 {
-                    // SYSCALL HLT format
                     if (sscanf(line, "%d SYSCALL HLT", &addr) == 1)
                     {
-                        instructions[*instruction_count].opcode = OP_SYSCALL_HLT;
-                        strncpy(instructions[*instruction_count].opcode_str, "SYSCALL HLT",
-                                sizeof(instructions[*instruction_count].opcode_str) - 1);
-                        instructions[*instruction_count].opcode_str[sizeof(instructions[*instruction_count].opcode_str) - 1] = '\0';
-                        instructions[*instruction_count].num_operands = 0;
+                        // FIXED: Store at actual address
+                        instructions[addr].opcode = OP_SYSCALL_HLT;
+                        strncpy(instructions[addr].opcode_str, "SYSCALL HLT",
+                                sizeof(instructions[addr].opcode_str) - 1);
+                        instructions[addr].opcode_str[sizeof(instructions[addr].opcode_str) - 1] = '\0';
+                        instructions[addr].num_operands = 0;
 
                         printf("Parsed instruction %d: SYSCALL HLT (enum: %d)\n",
-                               addr, instructions[*instruction_count].opcode);
+                               addr, instructions[addr].opcode);
+                        (*instruction_count)++;
                     }
                     else
                     {
@@ -423,17 +678,18 @@ void parse_program(FILE *file, Instruction *instructions, int *instruction_count
                 }
                 else if (strstr(line, "SYSCALL YIELD"))
                 {
-                    // SYSCALL YIELD format
                     if (sscanf(line, "%d SYSCALL YIELD", &addr) == 1)
                     {
-                        instructions[*instruction_count].opcode = OP_SYSCALL_YIELD;
-                        strncpy(instructions[*instruction_count].opcode_str, "SYSCALL YIELD",
-                                sizeof(instructions[*instruction_count].opcode_str) - 1);
-                        instructions[*instruction_count].opcode_str[sizeof(instructions[*instruction_count].opcode_str) - 1] = '\0';
-                        instructions[*instruction_count].num_operands = 0;
+                        // FIXED: Store at actual address
+                        instructions[addr].opcode = OP_SYSCALL_YIELD;
+                        strncpy(instructions[addr].opcode_str, "SYSCALL YIELD",
+                                sizeof(instructions[addr].opcode_str) - 1);
+                        instructions[addr].opcode_str[sizeof(instructions[addr].opcode_str) - 1] = '\0';
+                        instructions[addr].num_operands = 0;
 
                         printf("Parsed instruction %d: SYSCALL YIELD (enum: %d)\n",
-                               addr, instructions[*instruction_count].opcode);
+                               addr, instructions[addr].opcode);
+                        (*instruction_count)++;
                     }
                     else
                     {
@@ -446,8 +702,6 @@ void parse_program(FILE *file, Instruction *instructions, int *instruction_count
                     printf("Warning: Unknown SYSCALL format: %s", line);
                     continue;
                 }
-
-                (*instruction_count)++;
             }
             else
             {
@@ -456,30 +710,30 @@ void parse_program(FILE *file, Instruction *instructions, int *instruction_count
 
                 if (parsed >= 2)
                 {
-                    // Convert string to enum during parsing
-                    instructions[*instruction_count].opcode = string_to_opcode(op);
+                    // FIXED: Store at actual address, not instruction_count
+                    instructions[addr].opcode = string_to_opcode(op);
 
                     // Safe string copy with bounds checking
-                    strncpy(instructions[*instruction_count].opcode_str, op,
-                            sizeof(instructions[*instruction_count].opcode_str) - 1);
-                    instructions[*instruction_count].opcode_str[sizeof(instructions[*instruction_count].opcode_str) - 1] = '\0';
+                    strncpy(instructions[addr].opcode_str, op,
+                            sizeof(instructions[addr].opcode_str) - 1);
+                    instructions[addr].opcode_str[sizeof(instructions[addr].opcode_str) - 1] = '\0';
 
-                    instructions[*instruction_count].num_operands = parsed - 2;
+                    instructions[addr].num_operands = parsed - 2;
 
                     // Handle operands based on number parsed
                     if (parsed >= 3)
                     {
-                        instructions[*instruction_count].operands[0] = op1;
+                        instructions[addr].operands[0] = op1;
                     }
                     if (parsed >= 4)
                     {
-                        instructions[*instruction_count].operands[1] = op2;
+                        instructions[addr].operands[1] = op2;
                     }
 
-                    printf("Parsed instruction %d: %s (enum: %d)", addr, op, instructions[*instruction_count].opcode);
-                    for (int i = 0; i < instructions[*instruction_count].num_operands; i++)
+                    printf("Parsed instruction %d: %s (enum: %d)", addr, op, instructions[addr].opcode);
+                    for (int i = 0; i < instructions[addr].num_operands; i++)
                     {
-                        printf(" %ld", instructions[*instruction_count].operands[i]);
+                        printf(" %ld", instructions[addr].operands[i]);
                     }
                     printf("\n");
 
@@ -494,18 +748,6 @@ void parse_program(FILE *file, Instruction *instructions, int *instruction_count
     }
 
     printf("Parsing complete. Loaded %d instructions.\n", *instruction_count);
-
-    // Validate that we have at least some instructions
-    if (*instruction_count == 0)
-    {
-        printf("Warning: No instructions were parsed!\n");
-    }
-
-    // Print summary
-    printf("Memory initialization summary:\n");
-    printf("- Instructions loaded: %d\n", *instruction_count);
-    printf("- Data memory capacity: %d\n", DATA_MEMORY_CAPACITY);
-    printf("- Instruction memory capacity: %d\n", INST_MEMORY_CAPACITY);
 }
 
 // ISA function implementations
@@ -660,9 +902,9 @@ void SUBI(const MEM_LOCATION A1, MEM_LOCATION A2)
         return;
     }
 
-    DATA_MEMORY[A2]._sli = DATA_MEMORY[A1]._sli - DATA_MEMORY[A2]._sli;
+    DATA_MEMORY[A2]._sli = DATA_MEMORY[A2]._sli - DATA_MEMORY[A1]._sli;
     printf("SUBI: MEMORY[%lu] - MEMORY[%lu] = %ld (stored in MEMORY[%lu])\n",
-           A1, A2, DATA_MEMORY[A2]._sli, A2);
+           A2, A1, DATA_MEMORY[A2]._sli, A2);
 }
 
 void JIF(MEM_LOCATION A, INSTR_ADDR C)
@@ -679,7 +921,10 @@ void JIF(MEM_LOCATION A, INSTR_ADDR C)
 
     if (DATA_MEMORY[A]._sli <= 0)
     {
-        CPU_PC(&gtu_cpu) = C; // Subtract 1 because execute_instruction will increment
+        CPU_PC(&gtu_cpu) = C;
+        printf("CPU_PC: %ld\n", CPU_PC(&gtu_cpu));
+        printf("C: %ld\n", C);
+
         printf("JIF: Jump to %lu (condition met: MEMORY[%lu] = %ld <= 0)\n",
                C, A, DATA_MEMORY[A]._sli);
     }
@@ -758,6 +1003,8 @@ void CALL(INSTR_ADDR C)
 
     DATA_MEMORY[CPU_SP(&gtu_cpu)]._sli = return_addr;
     CPU_PC(&gtu_cpu) = C;
+    printf("CPU_PC: %ld\n", CPU_PC(&gtu_cpu));
+    printf("C: %ld\n", C);
 
     printf("CALL: Subroutine at %lu called, return address %ld pushed\n", C, return_addr);
 }

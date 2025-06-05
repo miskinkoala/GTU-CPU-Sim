@@ -1,0 +1,101 @@
+#GTU-C312 PUSH/POP Test Program
+Begin Data Section
+0 0     #program counter
+1 1000  # stack pointer - starts at 1000
+2 0     #system call result
+3 0     #instruction count
+4 0     #reserved
+5 0
+6 0
+7 0
+8 0
+9 0
+10 0
+11 0
+12 0
+13 0
+14 0
+15 0
+16 0
+17 0
+18 0
+19 0
+20 0
+# Test data for PUSH/POP operations
+50 42   # First test value
+51 -15  # Second test value (negative)
+52 100  # Third test value
+53 0    # Storage for first POP result
+54 0    # Storage for second POP result
+55 0    # Storage for third POP result
+56 255  # Fourth test value (boundary)
+57 0    # Storage for fourth POP result
+# Stack verification data
+60 0    # Expected stack pointer after operations
+61 0    # Temp storage for calculations
+62 0    # Counter for verification
+End Data Section
+
+Begin Instruction Section
+# Test 1: Basic PUSH operations
+0 PUSH 50            # Push 42 onto stack (SP becomes 999)
+1 PUSH 51            # Push -15 onto stack (SP becomes 998)
+2 PUSH 52            # Push 100 onto stack (SP becomes 997)
+3 PUSH 56            # Push 255 onto stack (SP becomes 996)
+
+# Test 2: Verify stack pointer value
+4 CPY 1 60           # Copy current SP to memory location 60
+5 SYSCALL PRN 60     # Print current stack pointer (should be 996)
+
+# Test 3: Basic POP operations (LIFO order)
+6 POP 57             # Pop 255 into location 57 (SP becomes 997)
+7 POP 55             # Pop 100 into location 55 (SP becomes 998)
+8 POP 54             # Pop -15 into location 54 (SP becomes 999)
+9 POP 53             # Pop 42 into location 53 (SP becomes 1000)
+
+# Test 4: Verify stack pointer restored
+10 CPY 1 61          # Copy final SP to memory location 61
+11 SYSCALL PRN 61    # Print final stack pointer (should be 1000)
+
+# Test 5: Print all popped values to verify LIFO order
+12 SYSCALL PRN 57    # Should print 255 (last pushed, first popped)
+13 SYSCALL PRN 55    # Should print 100
+14 SYSCALL PRN 54    # Should print -15
+15 SYSCALL PRN 53    # Should print 42 (first pushed, last popped)
+
+# Test 6: Complex PUSH/POP sequence
+16 SET 10 62         # Initialize counter
+17 PUSH 62           # Push counter value
+18 ADD 62 5          # Increment counter by 5
+19 PUSH 62           # Push incremented value
+20 POP 61            # Pop incremented value
+21 POP 60            # Pop original value
+22 SYSCALL PRN 60    # Print original (should be 10)
+23 SYSCALL PRN 61    # Print incremented (should be 15)
+
+# Test 7: Stack underflow protection test
+# (This should be handled by your implementation)
+24 CPY 1 60          # Get current SP
+25 SYSCALL PRN 60    # Print SP before potential underflow
+
+# Test 8: Multiple PUSH/POP in sequence
+26 SET 1 50          # Set test value 1
+27 SET 2 51          # Set test value 2  
+28 SET 3 52          # Set test value 3
+29 PUSH 50           # Push 1
+30 PUSH 51           # Push 2
+31 PUSH 52           # Push 3
+32 POP 55            # Pop 3
+33 POP 54            # Pop 2
+34 POP 53            # Pop 1
+35 SYSCALL PRN 53    # Should print 1
+36 SYSCALL PRN 54    # Should print 2
+37 SYSCALL PRN 55    # Should print 3
+
+# Test 9: Final stack pointer verification
+38 CPY 1 60          # Copy final SP
+39 SYSCALL PRN 60    # Should be back to 1000
+
+40 HLT               # End program
+
+End Instruction Section

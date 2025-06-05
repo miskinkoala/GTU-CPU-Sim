@@ -1,0 +1,126 @@
+#GTU-C312 Comprehensive ISA Test Program
+Begin Data Section
+0 0     #program counter
+1 1000  # stack pointer
+2 0     #system call result
+3 0     #instruction count
+4 0     #reserved
+5 0
+6 0
+7 0
+8 0
+9 0
+10 0
+11 0
+12 0
+13 0
+14 0
+15 0
+16 0
+17 0
+18 0
+19 0
+20 0
+# Test data for various operations
+50 10   # Test value 1
+51 0    # Test result storage
+52 5    # Test value 2
+53 0    # Another result storage
+54 200  # Indirect address pointer
+55 0    # Temp storage
+56 0    # Counter for loop
+57 3    # Loop limit
+58 0    # Array element 1
+59 0    # Array element 2
+60 0    # Array element 3
+# Subroutine test data
+100 42  # Value to be used in subroutine
+101 0   # Subroutine result
+# Search test data
+150 5   # Array size
+151 7   # Search key
+152 1   # Array[0]
+153 3   # Array[1] 
+154 7   # Array[2] - target
+155 9   # Array[3]
+156 11  # Array[4]
+157 -1  # Search result (-1 = not found, else index)
+# Indirect addressing test
+200 300 # Points to address 300
+201 400 # Points to address 400
+300 99  # Value at indirect location
+400 0   # Destination for indirect copy
+End Data Section
+
+Begin Instruction Section
+# Test 1: Basic SET operations
+0 SET 42 51          # SET: Store 42 in location 51
+1 SET -15 53         # SET: Store negative number
+
+# Test 2: Direct copy operations  
+2 CPY 50 55          # CPY: Copy value from 50 to 55
+
+# Test 3: Indirect copy operations
+3 CPYI 54 53         # CPYI: Copy from address stored in 54 to 53
+4 CPYI2 200 201      # CPYI2: Double indirect copy
+
+# Test 4: Arithmetic operations
+5 ADD 51 10          # ADD: Add 10 to location 51 (42+10=52)
+6 ADDI 51 52         # ADDI: Add value at 52 to value at 51
+7 SUBI 51 52         # SUBI: Subtract, store result in second operand
+
+# Test 5: Stack operations (PUSH/POP)
+8 PUSH 50            # PUSH: Push value at location 50 onto stack
+9 PUSH 51            # PUSH: Push another value
+10 POP 58            # POP: Pop into location 58
+11 POP 59            # POP: Pop into location 59
+
+# Test 6: Subroutine call and return
+12 CALL 45           # CALL: Call subroutine at instruction 30
+13 SET 100 101       # This executes after return
+
+# Test 7: Conditional jump (loop test)
+14 SET 0 56          # Initialize counter to 0
+15 SET 3 57          # Set loop limit to 3
+16 ADDI 56 50        # Add counter to accumulator at 50
+17 ADD 56 1          # Increment counter
+18 CPY 56 55         # Copy counter for comparison
+19 SUBI 57 55        # Subtract limit from counter, store in 55
+20 JIF 55 23         # Jump to 23 if counter >= limit (55 <= 0)
+21 SET 16 0          # Jump back to loop start (set PC to 16)
+22 SET 24 0          # This should be skipped
+
+# Test 8: Linear search implementation
+23 SET 0 157         # Initialize result to -1 (not found)
+24 SET 0 56          # Initialize index to 0
+25 CPY 152 55        # Load array[index] into temp
+26 ADD 55 56         # Calculate address: 152 + index
+27 CPYI 55 53        # Load array[index] value
+28 CPY 53 55         # Copy for comparison
+29 SUBI 151 55       # Compare with search key
+30 JIF 55 35         # If equal (difference = 0), jump to found
+31 ADD 56 1          # Increment index
+32 CPY 56 55         # Copy index for limit check
+33 SUBI 150 55       # Check if index >= array size
+34 JIF 55 37         # If done searching, jump to end
+35 SET 25 0          # Continue search loop
+36 SET 56 157        # Found: store index in result
+37 SYSCALL PRN 157   # Print search result
+
+# Test 9: System calls
+38 SYSCALL PRN 51    # SYSCALL_PRN: Print value at location 51
+39 SYSCALL YIELD     # SYSCALL_YIELD: Yield CPU
+
+# Test 10: User mode switch (commented out to avoid access violations)
+#40 USER 1000       # Switch to user mode and jump to user code
+
+# Test 11: Final halt
+45 HLT               # HLT: Halt the CPU
+
+# Subroutine starting at instruction 30
+50 SET 100 55        # Load parameter
+51 ADD 55 20         # Add 20 to parameter  
+52 SET 55 101        # Store result
+53 RET               # Return to caller
+
+End Instruction Section

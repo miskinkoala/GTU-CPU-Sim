@@ -1,0 +1,98 @@
+#GTU-C312 Complete JIF Test Program
+Begin Data Section
+0 0     #program counter
+1 1000  # stack pointer
+2 0     #system call result
+3 0     #instruction count
+4 0     #reserved
+5 0
+6 0
+7 0
+8 0
+9 0
+10 0
+11 0
+12 0
+13 0
+14 0
+15 0
+16 0
+17 0
+18 0
+19 0
+20 0
+# Test data for JIF operations
+50 5    # Positive test value
+51 0    # Zero test value
+52 -3   # Negative test value
+53 0    # Counter for loop test
+54 3    # Loop limit
+55 0    # Result storage
+56 10   # Countdown value
+57 0    # Temp storage
+End Data Section
+
+Begin Instruction Section
+# Test 1: JIF with positive value (should NOT jump)
+0 JIF 50 15         # Check if MEMORY[50] (5) <= 0, jump to 15 if true
+1 SET 100 55        # This should execute (5 > 0, no jump)
+2 SYSCALL PRN 55    # Print 100 to confirm no jump occurred
+
+# Test 2: JIF with zero value (should jump)
+3 JIF 51 20         # Check if MEMORY[51] (0) <= 0, jump to 20 if true
+4 SET 200 55        # This should be skipped (0 <= 0, jump occurs)
+5 SYSCALL PRN 55    # This should be skipped
+
+# Test 3: JIF with negative value (should jump)
+6 JIF 52 25         # Check if MEMORY[52] (-3) <= 0, jump to 25 if true
+7 SET 300 55        # This should be skipped (-3 <= 0, jump occurs)
+8 SYSCALL PRN 55    # This should be skipped
+
+# Test 4: Sequential execution after no jump
+9 SET 999 55        # This should execute after test 1
+10 SYSCALL PRN 55   # Print 999
+
+# Test 5: Countdown loop using JIF
+11 CPY 56 57        # Copy countdown value (10) to temp
+12 SYSCALL PRN 57   # Print current countdown value
+13 ADD 57 -1        # Decrement countdown
+14 JIF 57 30        # If countdown <= 0, jump to end
+15 SET 12 0         # Jump back to loop start (set PC to 12)
+
+# Jump target for test 1 (positive value - no jump expected)
+16 SET 9 0          # Continue to test 4
+
+# Test 6: Simple counter loop
+17 SET 0 53         # Initialize counter to 0
+18 SET 3 54         # Set limit to 3
+19 ADD 53 1         # Increment counter
+20 SYSCALL PRN 53   # Print counter value
+21 CPY 53 57        # Copy counter for comparison
+22 SUBI 54 57       # Subtract limit from counter (result in 57)
+23 JIF 57 35        # If (counter - limit) <= 0, continue loop
+24 SET 40 0         # Exit loop (jump to end)
+
+# Jump target for test 2 (zero value jump)
+25 SET 111 55       # Target for test 2 (zero value jump)
+26 SYSCALL PRN 55   # Print 111 to confirm jump occurred
+27 SET 6 0          # Continue to test 3
+
+# Jump target for test 3 (negative value jump)
+28 SET 222 55       # Target for test 3 (negative value jump)
+29 SYSCALL PRN 55   # Print 222 to confirm jump occurred
+30 SET 9 0          # Continue to test 4
+
+# Jump target for countdown loop end
+31 SET 333 55       # Target for countdown loop end
+32 SYSCALL PRN 55   # Print 333 to confirm loop ended
+33 SET 17 0         # Continue to counter loop
+
+# Continue counter loop target
+34 SET 19 0         # Continue counter loop
+
+# End of all tests
+35 SET 444 55       # End of all tests
+36 SYSCALL PRN 55   # Print 444 to confirm completion
+37 HLT              # End program
+
+End Instruction Section

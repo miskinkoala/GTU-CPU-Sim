@@ -1,0 +1,94 @@
+#GTU-C312 CPYI2 and USER Test Program
+Begin Data Section
+0 0     #program counter
+1 1000  # stack pointer
+2 0     #system call result
+3 0     #instruction count
+4 0     #reserved
+5 0
+6 0
+7 0
+8 0
+9 0
+10 0
+11 0
+12 0
+13 0
+14 0
+15 0
+16 0
+17 0
+18 0
+19 0
+20 0
+# Test data for CPYI2 operations
+50 200  # Pointer to source address (points to address 200)
+51 300  # Pointer to destination address (points to address 300)
+52 400  # Another source pointer (points to address 400)
+53 500  # Another destination pointer (points to address 500)
+54 600  # Chain pointer test (points to address 600)
+55 700  # Chain pointer test (points to address 700)
+# Actual data locations
+200 42  # Source data value 1
+300 0   # Destination 1 (will receive 42)
+400 -15 # Source data value 2 (negative test)
+500 0   # Destination 2 (will receive -15)
+600 100 # Source data value 3
+700 0   # Destination 3 (will receive 100)
+# Test data for USER instruction
+1000 1010  # User mode entry point address
+1001 0     # User mode test counter
+1002 5     # User mode test limit
+1003 0     # User mode result storage
+1004 0     # Temp storage for user mode
+End Data Section
+
+Begin Instruction Section
+# Test 1: Basic CPYI2 operation
+0 CPYI2 50 51       # Copy from MEMORY[MEMORY[50]] to MEMORY[MEMORY[51]]
+                    # Should copy MEMORY[200] (42) to MEMORY[300]
+1 SYSCALL PRN 300   # Print result (should be 42)
+
+# Test 2: CPYI2 with negative value
+2 CPYI2 52 53       # Copy from MEMORY[MEMORY[52]] to MEMORY[MEMORY[53]]
+                    # Should copy MEMORY[400] (-15) to MEMORY[500]
+3 SYSCALL PRN 500   # Print result (should be -15)
+
+# Test 3: CPYI2 chained operation
+4 CPYI2 54 55       # Copy from MEMORY[MEMORY[54]] to MEMORY[MEMORY[55]]
+                    # Should copy MEMORY[600] (100) to MEMORY[700]
+5 SYSCALL PRN 700   # Print result (should be 100)
+
+# Test 4: Verify original values unchanged
+6 SYSCALL PRN 200   # Should still be 42
+7 SYSCALL PRN 400   # Should still be -15
+8 SYSCALL PRN 600   # Should still be 100
+
+# Test 5: Prepare for USER mode test
+9 SET 1010 1000     # Set user mode entry point to instruction 1010
+
+# Test 6: Switch to USER mode
+10 USER 1000        # Switch to user mode and jump to address in MEMORY[1000]
+                    # Should jump to instruction 1010
+
+# Kernel mode instructions (should not execute after USER)
+11 SET 999 1003     # This should not execute
+12 SYSCALL PRN 1003 # This should not execute
+13 HLT              # This should not execute
+
+# User mode program starting at instruction 1010
+1010 SET 0 1001     # Initialize counter in user space
+1011 SET 5 1002     # Set limit in user space
+1012 ADD 1001 1     # Increment counter
+1013 SYSCALL PRN 1001 # Print counter (user can make syscalls)
+1014 CPY 1001 1004  # Copy counter for comparison
+1015 SUBI 1002 1004 # Subtract limit from counter
+1016 JIF 1004 1020  # If counter >= limit, exit loop
+1017 SET 1012 0     # Jump back to loop (set PC to 1012)
+
+# User mode loop exit
+1020 SET 777 1003   # Set completion marker
+1021 SYSCALL PRN 1003 # Print completion (should be 777)
+1022 HLT            # Halt in user mode
+
+End Instruction Section

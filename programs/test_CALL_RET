@@ -1,0 +1,111 @@
+#GTU-C312 CALL and RET Test Program
+Begin Data Section
+0 0     #program counter
+1 1000  # stack pointer
+2 0     #system call result
+3 0     #instruction count
+4 0     #reserved
+5 0
+6 0
+7 0
+8 0
+9 0
+10 0
+11 0
+12 0
+13 0
+14 0
+15 0
+16 0
+17 0
+18 0
+19 0
+20 0
+# Test data for CALL/RET operations
+50 10   # Parameter for first subroutine
+51 0    # Result storage for first subroutine
+52 5    # Parameter for second subroutine
+53 0    # Result storage for second subroutine
+54 0    # Temp storage
+55 0    # Counter for nested calls
+56 3    # Recursion limit
+57 0    # Factorial result storage
+End Data Section
+
+Begin Instruction Section
+# Test 1: Simple subroutine call
+0 SET 42 50         # Set parameter value
+1 CALL 20           # Call simple subroutine at instruction 20
+2 SYSCALL PRN 51    # Print result (should be 52)
+
+# Test 2: Subroutine with multiple operations
+3 SET 15 52         # Set parameter for second subroutine
+4 CALL 30           # Call arithmetic subroutine at instruction 30
+5 SYSCALL PRN 53    # Print result (should be 35)
+
+# Test 3: Nested subroutine calls
+6 SET 3 56          # Set factorial input
+7 CALL 40           # Call factorial subroutine
+8 SYSCALL PRN 57    # Print factorial result (should be 6)
+
+# Test 4: Multiple sequential calls
+9 SET 100 50        # Set new parameter
+10 CALL 20          # Call simple subroutine again
+11 SYSCALL PRN 51   # Print result (should be 110)
+
+12 SET 25 52        # Set new parameter
+13 CALL 30          # Call arithmetic subroutine again
+14 SYSCALL PRN 53   # Print result (should be 45)
+
+# Test 5: Verify stack pointer restoration
+15 CPY 1 54         # Copy stack pointer to temp
+16 SYSCALL PRN 54   # Should print 1000 (original SP)
+
+17 HLT              # End main program
+
+# Subroutine 1: Simple add 10 operation (starts at instruction 20)
+20 CPY 50 51        # Copy parameter to result
+21 ADD 51 10        # Add 10 to the parameter
+22 RET              # Return to caller
+
+# Subroutine 2: Arithmetic operations (starts at instruction 30)
+30 CPY 52 53        # Copy parameter to result
+31 ADD 53 20        # Add 20
+32 RET              # Return to caller
+
+# Subroutine 3: Factorial calculation with nested calls (starts at instruction 40)
+40 CPY 56 54        # Copy input to temp
+41 JIF 54 50        # If input <= 0, jump to base case
+42 SET 1 57         # Initialize result to 1
+43 CALL 55          # Call factorial helper
+44 RET              # Return to caller
+
+# Factorial helper subroutine (starts at instruction 55)
+55 JIF 54 65        # If counter <= 0, return
+56 CPY 57 51        # Copy current result to temp
+57 CPY 54 52        # Copy counter to temp
+58 CALL 70          # Call multiply subroutine
+59 CPY 53 57        # Copy multiplication result back
+60 ADD 54 -1        # Decrement counter
+61 SET 55 0         # Jump back to start of loop
+62 RET              # Return
+
+# Base case for factorial (instruction 50)
+50 SET 1 57         # Set result to 1
+51 RET              # Return
+
+# End of factorial helper (instruction 65)
+65 RET              # Return from factorial helper
+
+# Multiply subroutine (starts at instruction 70)
+70 SET 0 53         # Initialize result to 0
+71 JIF 52 80        # If multiplier <= 0, done
+72 ADD 53 51        # Add multiplicand to result
+73 ADD 52 -1        # Decrement multiplier
+74 SET 71 0         # Jump back to loop
+75 RET              # Return
+
+# End of multiply (instruction 80)
+80 RET              # Return from multiply
+
+End Instruction Section

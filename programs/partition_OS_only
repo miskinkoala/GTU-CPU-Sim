@@ -1,0 +1,405 @@
+#GTU-C312 Operating System - Complete Fixed Implementation
+Begin Data Section
+# CPU Registers (Memory-mapped) - Following project specification
+0 100        # Program Counter - Start OS at instruction 100
+1 1000       # Stack Pointer - OS stack starts at 1000
+2 0          # System call result
+3 0          # Number of instructions executed so far
+4 0          # temp1 - General purpose temporary register
+5 0          # temp2 - General purpose temporary register
+6 0          # temp3 - General purpose temporary register
+7 0          # temp4 - General purpose temporary register
+8 0          # temp5 - General purpose temporary register
+9 0          # temp6 - General purpose temporary register
+10 0         # param1 - Parameter passing register 1
+11 0         # param2 - Parameter passing register 2
+12 0         # param3 - Parameter passing register 3
+13 0         # always contain zero - Zero register
+14 0         # frame pointer - For stack frame management
+15 0         # Reserved for future use
+16 0         # Reserved for future use
+17 0         # Reserved for future use
+18 0         # Reserved for future use
+19 0         # Reserved for future use
+20 0         # Reserved for future use
+
+# OS Data Area (21-999) - Kernel mode only per specification
+21 57005     # OS Sentinel Value (0xDEAD) - Marks beginning of OS area
+22 4         # Number of threads (OS + 3 user threads)
+23 0         # Current running thread ID
+24 0         # Scheduler counter
+25 1         # OS state (0=initializing, 1=running, 2=shutdown)
+26 0         # Context switch flag
+27 0         # System call type buffer
+28 40        # Thread table base address
+29 0         # Current thread table pointer
+30 1         # Round robin scheduler index (start with thread 1)
+
+# Thread Table Structure (4 threads * 10 words each)
+# Thread 0 (OS itself) - starts at address 40
+40 0         # Thread ID (0 = OS)
+41 0         # Starting time
+42 0         # Instructions used
+43 2         # State (2=running)
+44 100       # PC value
+45 1000      # SP value
+46 1000      # Frame pointer
+47 0         # Saved temp1
+48 0         # Saved temp2
+49 0         # Reserved
+
+# Thread 1 - Sorting Thread
+50 1         # Thread ID
+51 0         # Starting time
+52 0         # Instructions used
+53 1         # State (1=ready) - FIXED
+54 1000      # PC value
+55 1500      # SP value
+56 1500      # Frame pointer
+57 0         # Saved temp1
+58 0         # Saved temp2
+59 0         # Reserved
+
+# Thread 2 - Search Thread
+60 2         # Thread ID
+61 0         # Starting time
+62 0         # Instructions used
+63 1         # State (1=ready) - FIXED
+64 2000      # PC value
+65 2500      # SP value
+66 2500      # Frame pointer
+67 0         # Saved temp1
+68 0         # Saved temp2
+69 0         # Reserved
+
+# Thread 3 - Factorial Thread
+70 3         # Thread ID
+71 0         # Starting time
+72 0         # Instructions used
+73 1         # State (1=ready) - FIXED
+74 3000      # PC value
+75 3500      # SP value
+76 3500      # Frame pointer
+77 0         # Saved temp1
+78 0         # Saved temp2
+79 0         # Reserved
+
+# OS Working Variables
+160 0        # Function parameter storage
+161 0        # Function return value
+162 0        # Loop counter
+163 0        # Comparison result
+164 0        # Address calculation
+165 1        # Next thread to schedule
+
+# Scheduler variables
+170 0        # Round robin counter
+171 0        # Context switch flag
+172 0        # System call type
+173 0        # System call parameter
+174 3        # Active thread count (3 user threads)
+175 0        # Completed thread count
+
+# OS Sentinel End Marker
+999 48879    # OS Sentinel Value (0xBEEF)
+
+# Thread 1 Data Area (1000-1999)
+1000 0       # Thread 1 starts here
+1001 5       # Array size
+1002 64      # Array element 1
+1003 34      # Array element 2
+1004 25      # Array element 3
+1005 12      # Array element 4
+1006 90      # Array element 5
+1007 0       # Temp variable
+1008 0       # Outer loop counter
+1009 0       # Inner loop counter
+
+# Thread 2 Data Area (2000-2999)
+2000 0       # Thread 2 starts here
+2001 5       # Array size
+2002 25      # Search key
+2003 64      # Array element 1
+2004 34      # Array element 2
+2005 25      # Array element 3 (target)
+2006 12      # Array element 4
+2007 90      # Array element 5
+2008 -1      # Search result
+2009 0       # Loop counter
+
+# Thread 3 Data Area (3000-3999)
+3000 0       # Thread 3 starts here
+3001 5       # Factorial input
+3002 1       # Factorial result
+3003 1       # Counter
+3004 0       # Temp variable
+
+End Data Section
+
+Begin Instruction Section
+# OS Boot and Initialization (Instructions 100-199)
+100 SET 0 13         # Initialize zero register
+101 SET 1 25         # Set OS state to running
+102 SET 0 23         # Set current thread to OS
+103 SET 40 28        # Set thread table base
+104 CALL 200         # Initialize thread table
+105 SET 110 0        # Jump to main OS loop
+
+# Main OS Loop (Instructions 110-150)
+110 CPY 25 4         # Check OS state
+111 SUBI 2 4         # Check if shutdown (state 2)
+112 JIF 4 190        # If shutting down, jump to shutdown
+113 CPY 175 5        # Check completed thread count
+114 SUBI 174 5       # Compare with active thread count
+115 JIF 5 180        # If all completed, shutdown
+116 CALL 400         # Call scheduler
+117 CALL 500         # Handle system calls
+118 ADD 24 1         # Increment scheduler counter
+119 SET 110 0        # Loop back
+
+# All Threads Completed Handler
+180 SET 57005 4      # Set completion marker (0xDEAD)
+181 SYSCALL PRN 4    # Print completion
+182 SET 2 25         # Set OS state to shutdown
+183 SET 190 0        # Jump to shutdown
+
+# OS Shutdown Sequence
+190 SET 48879 4      # Set shutdown marker (0xBEEF)
+191 SYSCALL PRN 4    # Print shutdown
+192 HLT              # Halt system
+
+# Thread Table Initialization (Instructions 200-250)
+200 CPY 14 4         # Save frame pointer
+201 CPY 1 14         # Set new frame pointer
+202 SET 40 5         # Thread table base
+203 SET 0 6          # Loop counter
+204 CPY 6 7          # Copy counter
+204 CPY 22 8          # Copy theread number
+205 SUBI 7 8        # Compare with thread count
+206 JIF 8 250        # If done, return
+207 CPY 5 10         # Table pointer to param1
+208 CPY 6 11         # Counter to param2
+209 CALL 260         # Initialize thread entry
+210 ADD 5 10         # Next thread entry
+211 ADD 6 1          # Increment counter
+212 SET 204 0        # Loop back
+250 CPY 4 14         # Restore frame pointer
+251 RET
+
+# Thread Initialization Helper (Instructions 260-290) - FIXED
+260 CPY 10 5         # Get table pointer
+261 CPY 11 6         # Get thread ID
+262 SET 6 5          # Store thread ID
+263 ADD 5 1          # Move to starting time
+264 CPY 3 7          # Current instruction count
+265 SET 7 5          # Store starting time
+266 ADD 5 2          # Move to instructions used
+267 SET 0 5          # Initialize to 0
+268 ADD 5 1          # Move to state field
+269 CPY 6 8          # Copy thread ID
+270 JIF 8 280        # If thread 0 (OS), set running
+271 CPY 6 9          # Copy thread ID again
+272 SUBI 4 9         # Check if thread ID > 3
+273 JIF 9 285        # If > 3, set inactive
+274 SET 1 5          # Set threads 1-3 to ready - FIXED
+275 SET 290 0        # Jump to end
+280 SET 2 5          # Set OS thread to running
+281 SET 290 0        # Jump to end
+285 SET 0 5          # Set threads > 3 to inactive
+290 RET
+
+# Scheduler (Instructions 400-450)
+400 CPY 14 4         # Save frame pointer
+401 CPY 1 14         # Set frame pointer
+402 CPY 23 5         # Get current thread ID
+403 JIF 5 420        # If OS thread, find user thread
+404 SET 450 0        # Continue current thread
+420 CALL 600         # Find next ready thread
+421 CPY 165 6        # Get selected thread
+422 JIF 6 450        # If no thread, stay in OS
+423 SET 6 23         # Set new current thread
+424 CALL 700         # Context switch
+450 CPY 4 14         # Restore frame pointer
+451 RET
+
+# System Call Handler (Instructions 500-550) - FIXED
+500 CPY 2 10         # Get system call result
+501 JIF 10 550       # If no syscall, return
+502 CPY 10 4         # Copy syscall type
+503 SUBI 1 4         # Check if PRN
+504 JIF 4 510        # Handle PRN
+505 ADD 4 1          # Restore value
+506 SUBI 2 4         # Check if YIELD
+507 JIF 4 520        # Handle YIELD
+508 ADD 4 2          # Restore value
+509 SUBI 3 4         # Check if HLT
+510 JIF 4 530        # Handle HLT
+511 SET 550 0        # Unknown syscall
+512 SET 100 11       # Block for 100 instructions (PRN)
+513 SET 550 0        # Return
+520 SET 1 171        # Set context switch flag (YIELD) - FIXED
+521 SET 0 23         # Return to OS thread - FIXED
+522 SET 550 0        # Return
+530 CALL 800         # Handle thread completion (HLT)
+531 SET 550 0        # Return
+550 SET 0 2          # Clear syscall result
+551 RET
+
+# Find Next Ready Thread (Instructions 600-650) - FIXED
+600 CPY 30 4         # Get round robin index
+601 ADD 4 1          # Next thread
+602 CPY 4 5          # Copy to temp
+603 SUBI 4 5         # Check if > 3
+604 JIF 5 610        # If > 3, wrap to 1
+605 SET 620 0        # Continue
+610 SET 1 4          # Wrap to thread 1
+620 SET 40 5         # Thread table base
+621 CPY 4 6          # Thread ID
+622 CALL 850         # Calculate address
+623 CPY 12 7         # Get address
+624 ADD 7 3          # Point to state field
+625 CPY 7 8          # Get state
+626 SUBI 1 8         # Check if ready
+627 JIF 8 640        # If ready, select
+628 ADD 4 1          # Try next thread
+629 CPY 4 9          # Copy thread ID
+630 SUBI 4 9         # Check if > 3
+631 JIF 9 635        # If > 3, wrap
+632 SET 622 0        # Continue search
+635 SET 1 4          # Wrap to 1
+636 SET 622 0        # Continue search
+640 SET 4 30         # Update round robin
+641 SET 4 165        # Store selected thread
+650 RET
+
+# Context Switch (Instructions 700-750) - FIXED
+700 CPY 14 4         # Save frame pointer
+701 CPY 1 14         # Set frame pointer
+702 CPY 23 5         # Current thread ID
+703 CPY 5 10         # Copy to param1
+704 CALL 850         # Calculate address
+705 CPY 12 6         # Get address
+706 ADD 6 4          # Point to PC field
+707 CPY 0 7          # Get current PC
+708 SET 7 6          # Save PC
+709 ADD 6 1          # Point to SP field
+710 CPY 1 8          # Get current SP
+711 SET 8 6          # Save SP
+712 CPY 165 5        # Get new thread ID
+713 SET 5 23         # Set current thread
+714 CPY 5 10         # Copy to param1
+715 CALL 850         # Calculate address
+716 CPY 12 6         # Get address
+717 ADD 6 4          # Point to PC field
+718 CPY 6 7          # Get saved PC
+719 SET 7 0          # Restore PC
+720 ADD 6 1          # Point to SP field
+721 CPY 6 8          # Get saved SP
+722 SET 8 1          # Restore SP
+723 USER 1000        # Switch to user mode - FIXED
+750 RET
+
+# Thread Completion Handler (Instructions 800-830)
+800 CPY 23 4         # Get current thread ID
+801 CPY 4 10         # Copy to param1
+802 CALL 850         # Calculate address
+803 CPY 12 5         # Get address
+804 ADD 5 3          # Point to state field
+805 SET 0 5          # Set inactive
+806 ADD 175 1        # Increment completed count
+807 SET 0 23         # Return to OS
+808 RET
+
+# Calculate Thread Address (Instructions 850-870)
+850 SET 40 11        # Thread table base
+851 CPY 10 12        # Thread ID to param3
+852 ADD 12 12        # Multiply by 10
+853 ADD 12 12
+854 ADD 12 12
+855 ADD 12 12
+856 ADD 12 12
+857 ADD 11 12        # Add to base
+858 RET
+
+# Thread 1: Simple Bubble Sort (Instructions 1000-1050)
+1000 SET 1002 4      # Array base address
+1001 CPY 1001 5      # Array size
+1002 SET 0 1008      # Outer loop counter
+1003 CPY 1008 6      # Copy outer counter
+1004 SUBI 5 6        # Compare with size
+1005 JIF 6 1040      # If done, print and exit
+1006 SET 0 1009      # Inner loop counter
+1007 CPY 1009 7      # Copy inner counter
+1008 CPY 5 8         # Copy size
+1009 SUBI 8 1008     # Subtract outer counter
+1010 SUBI 8 7        # Compare with inner
+1011 JIF 8 1035      # Inner loop done
+1012 CPY 4 9         # Array base
+1013 ADD 9 7         # Add inner counter
+1014 CPY 9 10        # Current element
+1015 ADD 9 1         # Next element address
+1016 CPY 9 11        # Next element
+1017 CPY 10 12       # Current to param3
+1018 SUBI 11 12      # Compare elements
+1019 JIF 12 1030     # If in order, continue
+1020 SET 11 9        # Swap: next to current pos
+1021 SUBI 9 1        # Previous position
+1022 SET 10 9        # Current to next pos
+1030 ADD 1009 1      # Increment inner
+1031 SYSCALL YIELD   # Yield CPU - FIXED
+1032 SET 1007 0      # Continue inner loop
+1035 ADD 1008 1      # Increment outer
+1036 SET 1003 0      # Continue outer loop
+1040 SYSCALL PRN 1002 # Print sorted elements
+1041 SYSCALL PRN 1003
+1042 SYSCALL PRN 1004
+1043 SYSCALL PRN 1005
+1044 SYSCALL PRN 1006
+1045 SYSCALL HLT     # Thread complete
+
+# Thread 2: Linear Search (Instructions 2000-2050)
+2000 SET 2003 4      # Array base
+2001 CPY 2001 5      # Array size
+2002 CPY 2002 6      # Search key
+2003 SET 0 2009      # Loop counter
+2004 SET -1 2008     # Result = not found
+2005 CPY 2009 7      # Copy counter
+2006 SUBI 5 7        # Compare with size
+2007 JIF 7 2040      # If done, print result
+2008 CPY 4 8         # Array base
+2009 ADD 8 7         # Add counter
+2010 CPY 8 9         # Get element
+2011 CPY 6 10        # Search key
+2012 SUBI 10 9       # Compare
+2013 JIF 10 2035     # If found
+2014 ADD 2009 1      # Increment counter
+2015 SYSCALL YIELD   # Yield CPU - FIXED
+2016 SET 2005 0      # Continue loop
+2035 SET 2009 2008   # Store found index
+2040 SYSCALL PRN 2008 # Print result
+2041 SYSCALL HLT     # Thread complete
+
+# Thread 3: Factorial Calculator (Instructions 3000-3050)
+3000 CPY 3001 4      # Factorial input
+3001 SET 1 3002      # Result = 1
+3002 SET 1 3003      # Counter = 1
+3003 CPY 3003 5      # Copy counter
+3004 SUBI 4 5        # Compare with input
+3005 JIF 5 3040      # If done, print
+3006 CPY 3002 6      # Current result
+3007 CPY 3003 7      # Counter
+3008 CALL 3020       # Multiply
+3009 CPY 12 3002     # Store result
+3010 ADD 3003 1      # Increment counter
+3011 SYSCALL YIELD   # Yield CPU - FIXED
+3012 SET 3003 0      # Continue loop
+3020 SET 0 12        # Multiply helper
+3021 JIF 7 3030      # If multiplier = 0, done
+3022 ADD 12 6        # Add multiplicand
+3023 ADD 7 -1        # Decrement multiplier
+3024 SET 3021 0      # Continue multiply
+3030 RET             # Return result in param3
+3040 SYSCALL PRN 3002 # Print factorial
+3041 SYSCALL HLT     # Thread complete
+
+End Instruction Section
