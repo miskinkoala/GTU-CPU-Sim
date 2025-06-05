@@ -274,6 +274,7 @@ void execute_instruction()
     ++;
 }
 
+/*
 int main(int argc, char *argv[])
 {
     init_cpu(DATA_MEMORY);
@@ -295,7 +296,7 @@ int main(int argc, char *argv[])
 
     fclose(fp);
 }
-
+*/
 int is_valid_memory_address(MEM_LOCATION addr)
 {
     return (addr >= 0 && addr < DATA_MEMORY_CAPACITY);

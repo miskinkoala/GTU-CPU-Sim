@@ -1,0 +1,286 @@
+#GTU-C312 Operating System Macros - Following MIPS Assembler Style
+# Macro definitions for GTU-C312 CPU registers and memory layout
+
+# ========== CPU REGISTER MACROS ==========
+# Define symbolic names for memory-mapped registers (following MIPS convention)
+
+.macro define_registers
+    # CPU Registers (Memory-mapped) - Following project specification
+    .eqv $PC 0          # Program Counter register
+    .eqv $SP 1          # Stack Pointer register  
+    .eqv $SYSCALL_RES 2 # System call result register
+    .eqv $INSTR_COUNT 3 # Number of instructions executed so far
+    .eqv $TEMP1 4       # General purpose temporary register 1
+    .eqv $TEMP2 5       # General purpose temporary register 2
+    .eqv $TEMP3 6       # General purpose temporary register 3
+    .eqv $TEMP4 7       # General purpose temporary register 4
+    .eqv $TEMP5 8       # General purpose temporary register 5
+    .eqv $TEMP6 9       # General purpose temporary register 6
+    .eqv $PARAM1 10     # Parameter passing register 1
+    .eqv $PARAM2 11     # Parameter passing register 2
+    .eqv $PARAM3 12     # Parameter passing register 3
+    .eqv $ZERO 13       # Always contains zero (like MIPS $zero)
+    .eqv $FP 14         # Frame pointer register
+    .eqv $RESERVED1 15  # Reserved for future use
+    .eqv $RESERVED2 16  # Reserved for future use
+    .eqv $RESERVED3 17  # Reserved for future use
+    .eqv $RESERVED4 18  # Reserved for future use
+    .eqv $RESERVED5 19  # Reserved for future use
+    .eqv $RESERVED6 20  # Reserved for future use
+.end_macro
+
+# ========== MEMORY LAYOUT MACROS ==========
+# Define memory regions according to GTU-C312 specification
+
+.macro define_memory_layout
+    # Memory Layout Constants
+    .eqv @KERNEL_START 21       # Start of kernel mode only area
+    .eqv @KERNEL_END 999        # End of kernel mode only area
+    .eqv @USER_START 1000       # Start of user mode accessible area
+    .eqv @THREAD1_START 1000    # Thread 1 memory area start
+    .eqv @THREAD1_END 1999      # Thread 1 memory area end
+    .eqv @THREAD2_START 2000    # Thread 2 memory area start
+    .eqv @THREAD2_END 2999      # Thread 2 memory area end
+    .eqv @THREAD3_START 3000    # Thread 3 memory area start
+    .eqv @THREAD3_END 3999      # Thread 3 memory area end
+    .eqv @THREAD4_START 4000    # Thread 4 memory area start
+    .eqv @THREAD4_END 4999      # Thread 4 memory area end
+    .eqv @THREAD5_START 5000    # Thread 5 memory area start
+    .eqv @THREAD5_END 5999      # Thread 5 memory area end
+    .eqv @THREAD6_START 6000    # Thread 6 memory area start
+    .eqv @THREAD6_END 6999      # Thread 6 memory area end
+    .eqv @THREAD7_START 7000    # Thread 7 memory area start
+    .eqv @THREAD7_END 7999      # Thread 7 memory area end
+    .eqv @THREAD8_START 8000    # Thread 8 memory area start
+    .eqv @THREAD8_END 8999      # Thread 8 memory area end
+    .eqv @THREAD9_START 9000    # Thread 9 memory area start
+    .eqv @THREAD9_END 9999      # Thread 9 memory area end
+    .eqv @THREAD10_START 10000  # Thread 10 memory area start
+    .eqv @THREAD10_END 10999    # Thread 10 memory area end
+.end_macro
+
+# ========== SENTINEL VALUE MACROS ==========
+# Define sentinel values for memory protection and debugging
+
+.macro define_sentinels
+    # OS Sentinel Values (following project specification)
+    .eqv SENTINEL_DEAD 57005    # 0xDEAD in decimal - OS area start marker
+    .eqv SENTINEL_BEEF 48879    # 0xBEEF in decimal - OS area end marker
+    .eqv SENTINEL_CAFE 51966    # 0xCAFE in decimal - Thread start marker
+    .eqv SENTINEL_BABE 47806    # 0xBABE in decimal - Thread end marker
+    .eqv SENTINEL_FACE 64206    # 0xFACE in decimal - Stack marker
+    .eqv SENTINEL_FEED 65261    # 0xFEED in decimal - Heap marker
+.end_macro
+
+# ========== OS DATA STRUCTURE MACROS ==========
+# Define OS-specific data structure locations
+
+.macro define_os_data
+    # OS Data Area (21-999) - Kernel mode only
+    .eqv @OS_SENTINEL_START 21  # OS Sentinel Value start
+    .eqv @THREAD_COUNT 22       # Number of threads
+    .eqv @CURRENT_THREAD 23     # Current running thread ID
+    .eqv @SCHEDULER_COUNTER 24  # Scheduler counter
+    .eqv @OS_STATE 25           # OS state (0=init, 1=running, 2=shutdown)
+    .eqv @CONTEXT_SWITCH_FLAG 26 # Context switch flag
+    .eqv @SYSCALL_TYPE 27       # System call type buffer
+    .eqv @THREAD_TABLE_BASE 28  # Thread table base address
+    .eqv @THREAD_TABLE_PTR 29   # Current thread table pointer
+    .eqv @ROUND_ROBIN_INDEX 30  # Round robin scheduler index
+    
+    # Thread Table Structure Constants
+    .eqv THREAD_ENTRY_SIZE 10   # Each thread entry is 10 words
+    .eqv @THREAD_TABLE_START 40 # Thread table starts at address 40
+    
+    # Thread State Values
+    .eqv THREAD_INACTIVE 0      # Thread is inactive
+    .eqv THREAD_READY 1         # Thread is ready to run
+    .eqv THREAD_RUNNING 2       # Thread is currently running
+    .eqv THREAD_BLOCKED 3       # Thread is blocked
+    
+    # OS Working Variables
+    .eqv @OS_WORK_START 160     # OS working variables start
+    .eqv @FUNC_PARAM_STORAGE 160 # Function parameter storage
+    .eqv @FUNC_RETURN_VALUE 161  # Function return value
+    .eqv @LOOP_COUNTER 162       # Loop counter
+    .eqv @COMPARISON_RESULT 163  # Comparison result
+    .eqv @ADDRESS_CALC 164       # Address calculation
+    .eqv @NEXT_THREAD 165        # Next thread to schedule
+    
+    # Scheduler Variables
+    .eqv @SCHEDULER_START 170    # Scheduler variables start
+    .eqv @ROUND_ROBIN_COUNTER 170 # Round robin counter
+    .eqv @CONTEXT_SWITCH_FLAG_2 171 # Context switch flag
+    .eqv @SYSCALL_TYPE_2 172     # System call type
+    .eqv @SYSCALL_PARAM 173      # System call parameter
+    .eqv @ACTIVE_THREAD_COUNT 174 # Active thread count
+    .eqv @COMPLETED_THREAD_COUNT 175 # Completed thread count
+    
+    .eqv @OS_SENTINEL_END 999    # OS Sentinel Value end
+.end_macro
+
+# ========== THREAD MANAGEMENT MACROS ==========
+# Macros for thread table manipulation
+
+.macro init_thread_entry %thread_id %start_addr %stack_addr
+    # Initialize a thread entry in the thread table
+    SET %thread_id @THREAD_TABLE_START + (%thread_id * THREAD_ENTRY_SIZE)
+    SET 0 @THREAD_TABLE_START + (%thread_id * THREAD_ENTRY_SIZE) + 1  # Starting time
+    SET 0 @THREAD_TABLE_START + (%thread_id * THREAD_ENTRY_SIZE) + 2  # Instructions used
+    SET THREAD_READY @THREAD_TABLE_START + (%thread_id * THREAD_ENTRY_SIZE) + 3  # State
+    SET %start_addr @THREAD_TABLE_START + (%thread_id * THREAD_ENTRY_SIZE) + 4   # PC
+    SET %stack_addr @THREAD_TABLE_START + (%thread_id * THREAD_ENTRY_SIZE) + 5   # SP
+    SET %stack_addr @THREAD_TABLE_START + (%thread_id * THREAD_ENTRY_SIZE) + 6   # FP
+.end_macro
+
+.macro set_thread_state %thread_id %state
+    # Set thread state (inactive, ready, running, blocked)
+    SET %state @THREAD_TABLE_START + (%thread_id * THREAD_ENTRY_SIZE) + 3
+.end_macro
+
+.macro get_thread_pc %thread_id %dest_reg
+    # Get thread's program counter
+    CPY @THREAD_TABLE_START + (%thread_id * THREAD_ENTRY_SIZE) + 4 %dest_reg
+.end_macro
+
+.macro set_thread_pc %thread_id %pc_value
+    # Set thread's program counter
+    SET %pc_value @THREAD_TABLE_START + (%thread_id * THREAD_ENTRY_SIZE) + 4
+.end_macro
+
+# ========== SYSTEM CALL MACROS ==========
+# Macros for system call handling
+
+.macro syscall_prn %memory_addr
+    # Print value at memory address
+    SYSCALL PRN %memory_addr
+.end_macro
+
+.macro syscall_yield
+    # Yield CPU to OS scheduler
+    SYSCALL YIELD
+.end_macro
+
+.macro syscall_halt
+    # Halt current thread
+    SYSCALL HLT
+.end_macro
+
+# ========== MEMORY PROTECTION MACROS ==========
+# Macros for memory access validation
+
+.macro check_kernel_access %addr %error_label
+    # Check if address is in kernel area (0-999)
+    CPY %addr $TEMP1
+    SUBI @KERNEL_END $TEMP1
+    JIF $TEMP1 %error_label  # Jump if addr > 999 (invalid kernel access)
+.end_macro
+
+.macro check_user_access %addr %error_label
+    # Check if address is in user area (1000+)
+    CPY %addr $TEMP1
+    SUBI @USER_START $TEMP1
+    JIF $TEMP1 %error_label  # Jump if addr < 1000 (invalid user access)
+.end_macro
+
+.macro place_sentinel %addr %sentinel_value
+    # Place sentinel value at memory address
+    SET %sentinel_value %addr
+.end_macro
+
+.macro verify_sentinel %addr %sentinel_value %error_label
+    # Verify sentinel value at memory address
+    CPY %addr $TEMP1
+    SUBI %sentinel_value $TEMP1
+    JIF $TEMP1 %error_label  # Jump if sentinel doesn't match
+.end_macro
+
+# ========== STACK MANAGEMENT MACROS ==========
+# Macros for stack operations
+
+.macro push_register %reg
+    # Push register value onto stack
+    PUSH %reg
+.end_macro
+
+.macro pop_register %reg
+    # Pop value from stack into register
+    POP %reg
+.end_macro
+
+.macro save_context %thread_id
+    # Save current thread context
+    CPY $PC @THREAD_TABLE_START + (%thread_id * THREAD_ENTRY_SIZE) + 4
+    CPY $SP @THREAD_TABLE_START + (%thread_id * THREAD_ENTRY_SIZE) + 5
+    CPY $FP @THREAD_TABLE_START + (%thread_id * THREAD_ENTRY_SIZE) + 6
+.end_macro
+
+.macro restore_context %thread_id
+    # Restore thread context
+    CPY @THREAD_TABLE_START + (%thread_id * THREAD_ENTRY_SIZE) + 4 $PC
+    CPY @THREAD_TABLE_START + (%thread_id * THREAD_ENTRY_SIZE) + 5 $SP
+    CPY @THREAD_TABLE_START + (%thread_id * THREAD_ENTRY_SIZE) + 6 $FP
+.end_macro
+
+# ========== DEBUGGING MACROS ==========
+# Macros for debugging and monitoring
+
+.macro print_debug_marker %marker_value
+    # Print debug marker value
+    SET %marker_value $TEMP1
+    SYSCALL PRN $TEMP1
+.end_macro
+
+.macro print_thread_state %thread_id
+    # Print current thread state
+    CPY @THREAD_TABLE_START + (%thread_id * THREAD_ENTRY_SIZE) + 3 $TEMP1
+    SYSCALL PRN $TEMP1
+.end_macro
+
+.macro print_memory_value %addr
+    # Print value at memory address
+    SYSCALL PRN %addr
+.end_macro
+
+# ========== INITIALIZATION MACRO ==========
+# Master initialization macro
+
+.macro initialize_gtu_c312_system
+    # Initialize all system components
+    define_registers
+    define_memory_layout
+    define_sentinels
+    define_os_data
+    
+    # Place initial sentinel values
+    place_sentinel @OS_SENTINEL_START SENTINEL_DEAD
+    place_sentinel @OS_SENTINEL_END SENTINEL_BEEF
+    
+    # Initialize zero register
+    SET 0 $ZERO
+    
+    # Initialize OS state
+    SET 1 @OS_STATE  # Set OS to running state
+    SET 0 @CURRENT_THREAD  # Start with OS thread
+    SET @THREAD_TABLE_START @THREAD_TABLE_BASE
+.end_macro
+
+# ========== USAGE EXAMPLE ==========
+# Example of how to use these macros in GTU-C312 assembly
+
+# At the beginning of your GTU-C312 program:
+# initialize_gtu_c312_system
+# 
+# # Initialize Thread 1
+# init_thread_entry 1 @THREAD1_START @THREAD1_START + 500
+# 
+# # Set thread to ready state
+# set_thread_state 1 THREAD_READY
+# 
+# # Place sentinels around thread memory
+# place_sentinel @THREAD1_START SENTINEL_CAFE
+# place_sentinel @THREAD1_END SENTINEL_BABE
+# 
+# # Print debug information
+# print_debug_marker SENTINEL_DEAD
+# print_thread_state 1
