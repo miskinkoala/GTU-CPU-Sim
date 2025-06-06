@@ -373,7 +373,7 @@ Begin Instruction Section
 211 ADD $TEMP2 1                      # Increment counter
 212 CPY 204 $PC                       # Loop back
 
-250 CPY $STORE15 $FP                  # Restore frame pointer
+250 CPY $STORE1 $FP                  # Restore frame pointer
 251 RET                               # Return
 
 # Thread Initialization Helper (Instructions 260-299)
@@ -515,11 +515,11 @@ Begin Instruction Section
 510 JIF $TEMP2 535                    # ✅ FIXED: Jump to actual HLT handler
 511 SET 550 $PC                       # Unknown system call, return
 
-# Handle PRN system call
+# Handle PRN system call - ALTERNATIVE FIX
 515 CPY @CURRENT_THREAD $STORE1       # Get current thread ID
 516 CPY $STORE1 $PARAM1               # Pass thread ID
-517 CALL 600                          # Get thread state helper
-518 CPY $PARAM3 $TEMP1                # Get thread table base
+517 CALL 650                          # ✅ NEW: Call thread table base helper
+518 CPY $PARAM3 $TEMP1                # Get thread table base address
 519 ADD $TEMP1 3                      # Move to state field
 520 SET THREAD_BLOCKED $TEMP1         # Set thread to BLOCKED
 521 SET 1 @CONTEXT_SWITCH_FLAG        # Force context switch
@@ -530,13 +530,30 @@ Begin Instruction Section
 526 SET 550 $PC                       # Return
 
 # Handle HLT system call
-535 CALL 800                          # Mark thread as completed
+535 CALL 900                          # Mark thread as completed
 536 SET 1 @CONTEXT_SWITCH_FLAG        # Force context switch
 537 SET 550 $PC                       # Return
 
 550 SET 0 $SYSCALL_RES                # Clear system call result
 551 RET                               # Return
 
+
+
+# Get Thread Table Base Helper (Instructions 650-699) - NEW FUNCTION
+650 CPY $PARAM1 $TEMP1                # Get thread ID
+651 SET @THREAD_TABLE_BASE $TEMP2     # Get thread table base (40)
+652 CPY $TEMP1 $TEMP3                 # Copy thread ID
+653 SET 0 $TEMP4                      # Initialize offset
+
+# Multiplication loop
+654 JIF $TEMP3 670                    # If thread ID = 0, skip multiplication
+655 ADD $TEMP4 THREAD_ENTRY_SIZE      # Add 10 to offset
+656 ADD $TEMP3 -1                     # Decrement thread ID counter
+657 SET 654 $PC                       # Loop back to check
+
+670 ADD $TEMP2 $TEMP4                 # Calculate thread entry base address
+671 CPY $TEMP2 $PARAM3                # Return base address in PARAM3
+672 RET                               # Return
 
 
 
@@ -707,14 +724,35 @@ Begin Instruction Section
 
 
 
-# Thread Completion Handler (Instructions 800-899)
-800 CPY @CURRENT_THREAD $PARAM1       # Get current thread ID
-801 CALL 600                          # Get thread table entry
-802 # Mark thread as inactive
-803 SET THREAD_INACTIVE $PARAM3       # Set state to inactive
-804 ADD @COMPLETED_THREAD_COUNT 1     # Increment completed count
-805 SET 0 @CURRENT_THREAD             # Reset current thread to OS
-806 RET                               # Return
+# Thread Completion Handler (Instructions 900-949) - USING HELPER FUNCTION
+900 CPY $FP $STORE1                   # Save frame pointer
+901 CPY $SP $FP                       # Set new frame pointer
+902 CPY @CURRENT_THREAD $PARAM1       # Get current thread ID and pass as parameter
+
+# Use existing helper function to get thread table base address
+903 CALL 650                          # Call thread table base helper
+904 CPY $PARAM3 $TEMP1                # Get thread table base address from helper
+
+# Mark thread as completed
+905 ADD $TEMP1 3                      # Move to state field (offset 3)
+906 SET THREAD_INACTIVE $TEMP1        # Set thread to INACTIVE at correct address
+
+# Update completion statistics
+907 ADD @COMPLETED_THREAD_COUNT 1     # Increment completed count
+908 SET 0 @CURRENT_THREAD             # Reset current thread to OS
+
+909 CPY $STORE1 $FP                   # Restore frame pointer
+910 RET                               # Return
+
+
+
+
+
+
+
+
+
+
 
 # Thread 1: Bubble Sort (Instructions 1000-1199)
 @THREAD1_START SET 1002 $TEMP1        # Load array start address
