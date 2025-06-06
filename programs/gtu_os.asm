@@ -19,7 +19,6 @@
 .define $STORE2 16
 .define $STORE3 17
 .define $STORE4 18
-.define $FURETURN1 19
 
 
 
@@ -102,7 +101,7 @@ $STORE1 0
 $STORE2 0
 $STORE3 0
 $STORE4 0
-$FURETURN1 0
+19 0
 20 0
 
 # OS Data Area (21-999) - Kernel mode only
@@ -175,7 +174,7 @@ $FURETURN1 0
 80 4
 81 0
 82 0
-83 THREAD_READY
+83 THREAD_INACTIVE
 84 @THREAD4_START
 85 @THREAD4_END
 86 @THREAD4_END
@@ -187,7 +186,7 @@ $FURETURN1 0
 90 5
 91 0
 92 0
-93 THREAD_READY
+93 THREAD_INACTIVE
 94 @THREAD5_START
 95 @THREAD5_END
 96 @THREAD5_END
@@ -199,7 +198,7 @@ $FURETURN1 0
 100 6
 101 0
 102 0
-103 THREAD_READY
+103 THREAD_INACTIVE
 104 @THREAD6_START
 105 @THREAD6_END
 106 @THREAD6_END
@@ -211,7 +210,7 @@ $FURETURN1 0
 110 7
 111 0
 112 0
-113 THREAD_READY
+113 THREAD_INACTIVE
 114 @THREAD7_START
 115 @THREAD7_END
 116 @THREAD7_END
@@ -223,7 +222,7 @@ $FURETURN1 0
 120 8
 121 0
 122 0
-123 THREAD_READY
+123 THREAD_INACTIVE
 124 @THREAD8_START
 125 @THREAD8_END
 126 @THREAD8_END
@@ -235,7 +234,7 @@ $FURETURN1 0
 130 9
 131 0
 132 0
-133 THREAD_READY
+133 THREAD_INACTIVE
 134 @THREAD9_START
 135 @THREAD9_END
 136 @THREAD9_END
@@ -247,7 +246,7 @@ $FURETURN1 0
 140 6
 141 0
 142 0
-143 THREAD_READY
+143 THREAD_INACTIVE
 144 @THREAD10_START
 145 @THREAD10_END
 146 @THREAD10_END
@@ -437,50 +436,72 @@ Begin Instruction Section
 301 SET $TEMP4 $TEMP1                 # Store SP
 302 RET                               # Return
 
-# Round Robin Scheduler (Instructions 400-499)
+
+
+# Round Robin Scheduler (Instructions 400-499) - COMPLETELY FIXED
 400 CPY $FP $STORE1                  # Save frame pointer
 401 CPY $SP $FP                       # Set new frame pointer
 
-# Find next ready thread
-402 CPY @CURRENT_THREAD $TEMP1        # Get current thread
-403 SET 1 $TEMP1                      # Start search from thread 1
-404 SET 0 $TEMP2                      # Search counter
+# Initialize search variables
+402 CPY @CURRENT_THREAD $TEMP1        # Get current thread ID
+403 ADD $TEMP1 1                      # Start search from next thread
+404 CPY $TEMP1 $TEMP4                 # Check if thread > 3
+405 ADD $TEMP4 -3                     # temp4 = thread_ID - 3
+406 JIF $TEMP4 408                    # If thread_ID <= 3, continue
+407 SET 1 $TEMP1                      # If thread_ID > 3, wrap to 1
+
+408 SET 0 $TEMP2                      # Initialize search counter
 
 # Search loop for next ready thread
-405 CPY $TEMP2 $TEMP3                 # Copy search counter
+409 CPY $TEMP2 $TEMP3                 # Copy search counter
+410 ADD $TEMP3 -3                     # Check if searched all 3 threads (1-3)
+411 JIF $TEMP3 413                    # If searched all, continue
+412 SET 470 $PC                       # If searched all, no ready thread found
 
-406 ADD $TEMP3 -3                     # Check if searched all 4 threads
-407 JIF $TEMP3 409
-408 SET $PC 450                       # If searched all, no ready thread
+# Get thread state for current candidate
+413 CPY $TEMP1 $PARAM1                # Pass thread ID to get state
+414 CALL 600                          # Get thread state
+415 CPY $PARAM3 $TEMP5                # Get thread state result
 
-409 CPY $TEMP1 $PARAM1                # Pass thread ID to get state
-410 CALL 600                          # Get thread state
-411 CPY $PARAM3 $TEMP5                # Get thread state result
-412 ADD $TEMP5 -1                     # Check if state == READY 0,1,2,3 
+# Check if thread state == READY (1) using proper equality test
+416 CPY $TEMP5 $TEMP6                 # Copy state
+417 ADD $TEMP6 -1                     # temp6 = state - 1
+418 JIF $TEMP6 420                    # If state <= 1, check second condition
+419 CPY 440 $PC                       # If state > 1, try next thread
+
+# Second equality check: 1 - stateF
+420 SET 1 $STORE2                    # Load constant 1
+421 CPY $STORE2 $STORE3             # Copy constant
+422 SUBI $TEMP5 $STORE3              # store3 = 1 - state
+423 JIF $STORE3 425                  # If 1 - state <= 0 (state >= 1) = 1
+424 CPY 440 $PC                       # If state < 1 = 0, try next thread
+
 # THREAD_INACTIVE 0
 # THREAD_READY 1
 # THREAD_RUNNING 2
 # THREAD_BLOCKED 3
-413 JIF $TEMP5 420                    # If not ready, try next
 
-# Found ready thread, switch to it
-413 CPY $TEMP2 @NEXT_THREAD           # Set next thread
-414 CALL 700                          # Perform context switch
-415 CPY 450 $PC                       # Jump to exit
+# Both conditions met: state == 1 (READY)
+425 CPY $TEMP1 @NEXT_THREAD           # Set next thread (found ready thread)
+426 CALL 700                          # Perform context switch
+427 SET 470 $PC                       # Jump to exit
 
 # Try next thread
-420 ADD $TEMP2 1                      # Increment thread ID
-421 CPY $TEMP2 $TEMP6                 # Copy thread ID
-422 ADD $TEMP6 -4                     # Check if > 4
-423 JIF $TEMP6 425                    # If > 4, wrap to 1
-424 CPY 430 $PC                       # Continue search
-425 SET 1 $TEMP2                      # Wrap to thread 1
+440 ADD $TEMP1 1                      # Increment THREAD ID (not search counter)
+441 CPY $TEMP1 $TEMP4                 # Copy thread ID
+442 ADD $TEMP4 -3                     # Check if > 3
+443 JIF $TEMP4 445                    # If > 3, wrap to 1
+444 SET 450 $PC                       # Continue with current thread ID
 
-430 ADD $TEMP3 1                      # Increment search counter
-431 CPY 405 $PC                       # Continue search loop
+445 SET 1 $TEMP1                      # Wrap to thread 1
 
-450 CPY $STORE16 $FP                  # Restore frame pointer
-451 RET                               # Return
+450 ADD $TEMP2 1                      # Increment search counter
+451 CPY 409 $PC                       # Continue search loop
+
+# Exit scheduler (no ready thread found or context switch completed)
+470 CPY $STORE1 $FP                  # Restore frame pointer
+471 RET                               # Return
+
 
 # System Call Handler (Instructions 500-599)
 500 CPY $SYSCALL_RES $TEMP1           # Check if system call pending
@@ -510,7 +531,7 @@ Begin Instruction Section
 # Handle HLT system call
 530 CALL 800                          # Mark thread as completed
 531 SET 1 @CONTEXT_SWITCH_FLAG        # Force context switch
-532 CPY 550 $PC                       # Return
+532 SET 550 $PC                       # Return
 
 550 SET 0 $SYSCALL_RES                # Clear system call result
 551 RET                               # Return
