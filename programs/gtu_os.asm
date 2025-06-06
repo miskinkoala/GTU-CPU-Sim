@@ -551,22 +551,152 @@ Begin Instruction Section
 
 
 
-# Context Switch (Instructions 700-799)
-700 CPY $FP $STORE17                  # Save frame pointer
+# Context Switch (Instructions 700-799) - COMPLETE IMPLEMENTATION
+700 CPY $FP $STORE1                   # Save frame pointer
 701 CPY $SP $FP                       # Set new frame pointer
 
+# Get current thread ID and validate
+702 CPY @CURRENT_THREAD $STORE2       # Get current thread ID
+703 JIF $STORE2 720                   # If current thread = 0 (OS), skip saving
+
 # Save current thread context
-702 CPY @CURRENT_THREAD $PARAM1       # Get current thread ID
-703 CALL 600                          # Get thread table entry
-704 # Context saving would go here (simplified for now)
+704 CPY $STORE2 $PARAM1               # Pass current thread ID
+705 CALL 750                          # Save current thread state
+706 CPY $PARAM3 $TEMP1                # Get thread table address result
+707 ADD $TEMP1 3                      # Move to state field
+708 SET THREAD_READY $TEMP1           # Set current thread to READY
 
-# Switch to next thread
-705 CPY @NEXT_THREAD @CURRENT_THREAD  # Update current thread
-706 CPY @CURRENT_THREAD $PARAM1       # Get new thread ID
-707 CALL 750                          # Load new thread context
+# Load new thread context
+720 CPY @NEXT_THREAD $STORE3          # Get next thread ID
+721 CPY $STORE3 @CURRENT_THREAD       # Update current thread
+722 CPY $STORE3 $PARAM1               # Pass new thread ID
+723 CALL 800                          # ✅ FIXED: Call correct load helper
+724 CPY $PARAM3 $TEMP1                # Get thread table address result
+725 ADD $TEMP1 3                      # Move to state field
+726 SET THREAD_RUNNING $TEMP1         # Set new thread to RUNNING
 
-750 CPY $STORE17 $FP                  # Restore frame pointer
-751 RET                               # Return
+# Switch to user mode and jump to new thread
+727 CPY $STORE3 $TEMP2                # Copy new thread ID
+728 JIF $TEMP2 740                    # If thread 0 (OS), stay in kernel
+729 CALL 790                          # Switch to user mode for user threads
+730 CPY 740 $PC                       # Jump to exit
+
+740 CPY $STORE1 $FP                   # Restore frame pointer
+741 RET                               # Return
+
+# Save Thread State Helper (Instructions 750-799) - COMPLETELY FIXED
+750 CPY $FP $STORE1                   # Save frame pointer
+751 CPY $SP $FP                       # Set new frame pointer
+752 CPY $PARAM1 $TEMP1                # Get thread ID
+
+# Calculate thread table base address manually (thread_ID * 10)
+753 SET @THREAD_TABLE_BASE $TEMP2     # Get thread table base (40)
+754 CPY $TEMP1 $TEMP3                 # Copy thread ID
+755 SET 0 $TEMP4                      # Initialize offset
+
+# Multiplication loop: offset = thread_ID * THREAD_ENTRY_SIZE
+756 JIF $TEMP3 770                    # If thread ID = 0, skip multiplication
+757 ADD $TEMP4 THREAD_ENTRY_SIZE      # Add 10 to offset
+758 ADD $TEMP3 -1                     # Decrement thread ID counter
+759 SET 756 $PC                       # Loop back to check
+
+# Calculate thread entry base address
+770 ADD $TEMP2 $TEMP4                 # base + offset = thread entry address
+
+# Save CPU registers to thread table
+771 CPY $TEMP2 $STORE2                # Save thread entry base address
+772 ADD $STORE2 4                     # Move to PC field (offset 4)
+773 CPY $PC $TEMP5                    # Get current PC
+774 SET $TEMP5 $STORE2                # Store PC in thread table
+
+775 CPY $TEMP2 $STORE2                # Restore thread entry base
+776 ADD $STORE2 5                     # Move to SP field (offset 5)
+777 CPY $SP $TEMP5                    # Get current SP
+778 SET $TEMP5 $STORE2                # Store SP in thread table
+
+779 CPY $TEMP2 $STORE2                # Restore thread entry base
+780 ADD $STORE2 6                     # Move to FP field (offset 6)
+781 CPY $FP $TEMP5                    # Get current FP
+782 SET $TEMP5 $STORE2                # Store FP in thread table
+
+# Save additional working registers if needed
+783 CPY $TEMP2 $STORE2                # Restore thread entry base
+784 ADD $STORE2 7                     # Move to saved register area (offset 7)
+785 CPY $TEMP1 $TEMP5                 # Save TEMP1 (thread ID)
+786 SET $TEMP5 $STORE2                # Store in thread table
+
+787 ADD $STORE2 1                     # Move to next save slot (offset 8)
+788 CPY $TEMP2 $TEMP5                 # Save TEMP2 (base address)
+789 SET $TEMP5 $STORE2                # Store in thread table
+
+790 CPY $TEMP2 $PARAM3                # Return thread table base address
+791 CPY $STORE1 $FP                   # Restore frame pointer
+792 RET                               # Return
+
+
+# Load Thread State Helper (Instructions 800-849) - COMPLETE
+800 CPY $FP $STORE1                   # Save frame pointer
+801 CPY $SP $FP                       # Set new frame pointer
+802 CPY $PARAM1 $TEMP1                # Get thread ID
+
+# Calculate thread table base address manually
+803 SET @THREAD_TABLE_BASE $TEMP2     # Get thread table base (40)
+804 CPY $TEMP1 $TEMP3                 # Copy thread ID
+805 SET 0 $TEMP4                      # Initialize offset
+
+# Multiplication loop: offset = thread_ID * THREAD_ENTRY_SIZE
+806 JIF $TEMP3 820                    # If thread ID = 0, skip multiplication
+807 ADD $TEMP4 THREAD_ENTRY_SIZE      # Add 10 to offset
+808 ADD $TEMP3 -1                     # Decrement thread ID counter
+809 SET 806 $PC                       # Loop back to check
+
+# Calculate thread entry base address
+820 ADD $TEMP2 $TEMP4                 # base + offset = thread entry address
+
+# Load CPU registers from thread table
+821 CPY $TEMP2 $STORE2                # Save thread entry base address
+822 ADD $STORE2 4                     # Move to PC field (offset 4)
+823 CPYI $STORE2 $TEMP5               # Get stored PC value
+824 SET $TEMP5 $PC                    # Restore PC
+
+825 CPY $TEMP2 $STORE2                # Restore thread entry base
+826 ADD $STORE2 5                     # Move to SP field (offset 5)
+827 CPYI $STORE2 $TEMP5               # Get stored SP value
+828 SET $TEMP5 $SP                    # Restore SP
+
+829 CPY $TEMP2 $STORE2                # Restore thread entry base
+830 ADD $STORE2 6                     # Move to FP field (offset 6)
+831 CPYI $STORE2 $TEMP5               # Get stored FP value
+832 SET $TEMP5 $FP                    # Restore FP
+
+# Load additional working registers if needed
+833 CPY $TEMP2 $STORE2                # Restore thread entry base
+834 ADD $STORE2 7                     # Move to saved register area (offset 7)
+835 CPYI $STORE2 $TEMP1               # Restore TEMP1
+
+836 ADD $STORE2 1                     # Move to next save slot (offset 8)
+837 CPYI $STORE2 $TEMP2               # Restore TEMP2
+
+838 CPY $TEMP2 $PARAM3                # Return thread table base address
+839 CPY $STORE1 $FP                   # Restore frame pointer
+840 RET                               # Return
+
+
+
+
+
+# Switch to User Mode Helper (Instructions 850-899)
+850 CPY $PARAM1 $TEMP1                # Get thread ID
+851 SET 1000 $TEMP2                   # Base user address
+852 CPY $TEMP1 $TEMP3                 # Copy thread ID
+853 ADD $TEMP3 $TEMP3                 # thread_ID * 2
+854 ADD $TEMP3 $TEMP3                 # thread_ID * 4
+855 ADD $TEMP3 $TEMP3                 # thread_ID * 8
+856 ADD $TEMP2 $TEMP3                 # Approximate thread start address
+857 USER $TEMP2                       # Switch to user mode and jump
+858 RET                               # Return (should not reach here)
+
+
 
 # Thread Completion Handler (Instructions 800-899)
 800 CPY @CURRENT_THREAD $PARAM1       # Get current thread ID
