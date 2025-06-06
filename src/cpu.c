@@ -244,8 +244,11 @@ void execute_instruction()
     if (current_instr->opcode == OP_UNKNOWN)
     {
         printf("Error: No instruction at PC %ld\n", current_pc);
-        gtu_cpu.halted = 1;
+        CPU_PC(&gtu_cpu)
+        ++;
         return;
+        // gtu_cpu.halted = 1;
+        // return;
     }
 
     // Store current PC to detect if instruction modified it

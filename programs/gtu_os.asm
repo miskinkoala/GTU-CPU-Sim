@@ -15,6 +15,11 @@
 .define $PARAM3 12
 .define $ZERO 13
 .define $FP 14
+.define $STORE15 15
+.define $STORE16 16
+.define $STORE17 17
+.define $STORE18 18
+
 
 # Memory Layout Constants
 .define @KERNEL_START 21
@@ -26,6 +31,20 @@
 .define @THREAD2_END 2999
 .define @THREAD3_START 3000
 .define @THREAD3_END 3999
+.define @THREAD4_START 4000
+.define @THREAD4_END 4999
+.define @THREAD5_START 5000
+.define @THREAD5_END 5999
+.define @THREAD6_START 6000
+.define @THREAD6_END 6999
+.define @THREAD7_START 7000
+.define @THREAD7_END 7999
+.define @THREAD8_START 8000
+.define @THREAD8_END 8999
+.define @THREAD9_START 9000
+.define @THREAD9_END 9999
+.define @THREAD10_START 10000
+.define @THREAD10_END 10999
 .define @THREAD_TABLE_BASE 40
 
 # Sentinel Values
@@ -39,7 +58,7 @@
 .define THREAD_BLOCKED 3
 
 # System Configuration
-.define MAX_THREADS 4
+.define MAX_THREADS 11
 .define THREAD_ENTRY_SIZE 10
 
 # OS Data Locations
@@ -77,10 +96,10 @@ $PARAM2 0
 $PARAM3 0
 $ZERO 0
 $FP 0
-15 0
-16 0
-17 0
-18 0
+$STORE15 0
+$STORE16 0
+$STORE17 0
+$STORE18 0
 19 0
 20 0
 
@@ -96,15 +115,20 @@ $FP 0
 29 0
 30 1
 
+
+
+#ID:1 starting time:2 how many execution:3 so far in the thread:4 state:5, PC:6, SP:7, FP:8,
 # Thread Table Structure (4 threads * 10 words each)
 # Thread 0 (OS itself)
+#######THREAD TABLE#######
+
 @THREAD_TABLE_BASE 0
 41 0
 42 0
 43 THREAD_RUNNING
-44 100
-45 1000
-46 1000
+44 @KERNEL_START
+45 @KERNEL_END
+46 @KERNEL_END
 47 0
 48 0
 49 0
@@ -145,6 +169,91 @@ $FP 0
 78 0
 79 0
 
+# Thread 4 (placeholder Thread) - FIXED STACK SIZE
+80 4
+81 0
+82 0
+83 THREAD_READY
+84 @THREAD4_START
+85 @THREAD4_END
+86 @THREAD4_END
+87 0
+88 0
+89 0
+
+# Thread 5 (placeholder Thread) - FIXED STACK SIZE
+90 5
+91 0
+92 0
+93 THREAD_READY
+94 @THREAD5_START
+95 @THREAD5_END
+96 @THREAD5_END
+97 0
+98 0
+99 0
+
+# Thread 6 (placeholder Thread) - FIXED STACK SIZE
+100 6
+101 0
+102 0
+103 THREAD_READY
+104 @THREAD6_START
+105 @THREAD6_END
+106 @THREAD6_END
+107 0
+108 0
+109 0
+
+# Thread 7 (Custom Thread) - FIXED STACK SIZE
+110 7
+111 0
+112 0
+113 THREAD_READY
+114 @THREAD7_START
+115 @THREAD7_END
+116 @THREAD7_END
+117 0
+118 0
+119 0
+
+# Thread 8 (placeholder Thread) - FIXED STACK SIZE
+120 8
+121 0
+122 0
+123 THREAD_READY
+124 @THREAD8_START
+125 @THREAD8_END
+126 @THREAD8_END
+127 0
+128 0
+129 0
+
+# Thread 9 (placeholder Thread) - FIXED STACK SIZE
+130 9
+131 0
+132 0
+133 THREAD_READY
+134 @THREAD9_START
+135 @THREAD9_END
+136 @THREAD9_END
+137 0
+138 0
+139 0
+
+# Thread 10 (placeholder Thread) - FIXED STACK SIZE
+140 6
+141 0
+142 0
+143 THREAD_READY
+144 @THREAD10_START
+145 @THREAD10_END
+146 @THREAD10_END
+147 0
+148 0
+149 0
+
+
 # OS Working Variables
 160 0
 161 0
@@ -156,7 +265,7 @@ $FP 0
 171 0
 172 0
 173 0
-@ACTIVE_THREAD_COUNT 3
+@ACTIVE_THREAD_COUNT 4
 @COMPLETED_THREAD_COUNT 0
 
 @KERNEL_END SENTINEL_BEEF
@@ -202,16 +311,17 @@ Begin Instruction Section
 100 SET 0 $ZERO
 101 SET 1 @OS_STATE
 102 SET 0 @CURRENT_THREAD
-103 SET @THREAD_TABLE_BASE 28
+
+
 104 CALL 200
-105 SET 110 0
+105 SET 110 $PC
 
 # Main OS Loop (Instructions 110-150)
 110 CPY @OS_STATE $TEMP1
-111 SUBI 2 $TEMP1
+111 SUBI $SYSCALL_RES $TEMP1 #if sys call result = 1 then it will jump shutdown OS
 112 JIF $TEMP1 190
 113 CPY @COMPLETED_THREAD_COUNT $TEMP2
-114 SUBI @ACTIVE_THREAD_COUNT $TEMP2
+114 SUBI @ACTIVE_THREAD_COUNT $TEMP2 #when compleated_thread_count - 4(@ACTIVE_THREAD_COUNT) == 0 jump thread complete scenerio
 115 JIF $TEMP2 180
 116 CALL 400
 117 CALL 500
@@ -229,44 +339,49 @@ Begin Instruction Section
 191 SYSCALL PRN $TEMP1
 192 HLT
 
-# Thread Table Initialization (Instructions 200-250)
+# Thread Table Initialization (Instructions 200-250) - FIXED
+# temp1: frame pointer, 
+#
 200 CPY $FP $TEMP1
 201 CPY $SP $FP
-202 SET @THREAD_TABLE_BASE $TEMP2
-203 SET 0 $TEMP3
-204 CPY $TEMP3 $TEMP4
-205 SUBI @THREAD_COUNT $TEMP4
-206 JIF $TEMP4 250
+202 CPY @THREAD_TABLE_BASE $TEMP2
+203 SET 0 $TEMP3              # Initialize counter to 0
+204 CPY @THREAD_COUNT $TEMP4  # Load thread count
+205 SUBI $TEMP3 $TEMP4        # temp4 = thread_count - counter
+206 JIF $TEMP4 250            # Exit if thread_count - counter <= 0 (i.e., counter >= thread_count)
 207 CPY $TEMP2 $PARAM1
 208 CPY $TEMP3 $PARAM2
 209 CALL 260
 210 ADD $TEMP2 THREAD_ENTRY_SIZE
-211 ADD $TEMP3 1
-212 SET 204 0
+211 ADD $TEMP3 1              # Increment counter
+212 SET 204 0                 # Jump back to loop condition
 250 CPY $TEMP1 $FP
 251 RET
 
 # Thread Initialization Helper (Instructions 260-290)
-260 CPY $PARAM1 $TEMP2
-261 CPY $PARAM2 $TEMP3
-262 SET $TEMP3 $TEMP2
-263 ADD $TEMP2 1
-264 CPY $INSTR_COUNT $TEMP4
-265 SET $TEMP4 $TEMP2
-266 ADD $TEMP2 2
-267 SET 0 $TEMP2
-268 ADD $TEMP2 1
-269 CPY $TEMP3 $TEMP4
-270 JIF $TEMP4 280
-271 CPY $TEMP3 $TEMP5
-272 SUBI 3 $TEMP5
-273 JIF $TEMP5 285
-274 SET THREAD_READY $TEMP2
-275 SET 290 0
-280 SET THREAD_RUNNING $TEMP2
-281 SET 290 0
-285 SET THREAD_INACTIVE $TEMP2
+#$PARAM1 (register 10): Pointer to the thread 
+#$PARAM2 (register 11): Thread ID (0 for OS, 1-3 for user threads)
+260 CPY $PARAM1 $TEMP2        # Copy thread table pointer
+261 CPY $PARAM2 $TEMP3        # Copy thread ID
+262 CPY $TEMP3 $TEMP2
+263 ADD $TEMP2 1              # Move to starting time field
+264 CPY $INSTR_COUNT $TEMP4   # Get current instruction count
+265 CPY $TEMP4 $TEMP2         # ✅ FIXED - Copy instruction count to memory
+266 ADD $TEMP2 2              # Move to instructions used field
+267 SET 0 $TEMP2              # ✅ CORRECT - Set constant 0
+268 ADD $TEMP2 1              # Move to state field
+269 CPY $TEMP3 $TEMP4         # Copy thread ID
+270 JIF $TEMP4 280            # If thread ID = 0, jump to set RUNNING
+271 CPY $TEMP3 $TEMP5         # Copy thread ID
+272 SUBI @THREAD_COUNT $TEMP5  # Calculate: 3 - thread_ID
+273 JIF $TEMP5 285            # If thread_ID > 3, jump to set INACTIVE
+274 SET THREAD_READY $TEMP2   # ✅ CORRECT - THREAD_READY is constant (1)
+275 SET 290 0                 # Jump to return
+280 SET THREAD_RUNNING $TEMP2 # ✅ CORRECT - THREAD_RUNNING is constant (2)
+281 SET 290 0                 # Jump to return
+285 SET THREAD_INACTIVE $TEMP2 # ✅ CORRECT - THREAD_INACTIVE is constant (0)
 290 RET
+
 
 # Main Scheduler (Instructions 400-450)
 400 CPY $FP $TEMP1

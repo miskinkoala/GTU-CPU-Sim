@@ -183,20 +183,20 @@ Begin Instruction Section
 191 SYSCALL PRN 4
 192 HLT
 
-# Thread Table Initialization (Instructions 200-250)
+# Thread Table Initialization (Instructions 200-250) - FIXED
 200 CPY 14 4
 201 CPY 1 14
 202 SET 40 5
-203 SET 0 6
-204 CPY 6 7
-205 SUBI 22 7
-206 JIF 7 250
+203 SET 0 6              # Initialize counter to 0
+204 CPY 22 7  # Load thread count
+205 SUBI 6 7        # temp4 = thread_count - counter
+206 JIF 7 250            # Exit if thread_count - counter <= 0 (i.e., counter >= thread_count)
 207 CPY 5 10
 208 CPY 6 11
 209 CALL 260
 210 ADD 5 10
-211 ADD 6 1
-212 SET 204 0
+211 ADD 6 1              # Increment counter
+212 SET 204 0                 # Jump back to loop condition
 250 CPY 4 14
 251 RET
 
