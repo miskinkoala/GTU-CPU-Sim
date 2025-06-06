@@ -438,69 +438,64 @@ Begin Instruction Section
 
 
 
-# Round Robin Scheduler (Instructions 400-499) - COMPLETELY FIXED
-400 CPY $FP $STORE1                  # Save frame pointer
+# Round Robin Scheduler (Instructions 400-499) - ADJUSTED FOR YOUR REGISTER LAYOUT
+400 CPY $FP $STORE1                   # Save frame pointer
 401 CPY $SP $FP                       # Set new frame pointer
 
 # Initialize search variables
-402 CPY @CURRENT_THREAD $TEMP1        # Get current thread ID
-403 ADD $TEMP1 1                      # Start search from next thread
-404 CPY $TEMP1 $TEMP4                 # Check if thread > 3
-405 ADD $TEMP4 -3                     # temp4 = thread_ID - 3
-406 JIF $TEMP4 408                    # If thread_ID <= 3, continue
-407 SET 1 $TEMP1                      # If thread_ID > 3, wrap to 1
+402 CPY @CURRENT_THREAD $STORE2       # ✅ Use STORE2 for current thread ID (persistent)
+403 ADD $STORE2 1                     # Start search from next thread
+404 CPY $STORE2 $TEMP1                # Check if thread > 3
+405 ADD $TEMP1 -3                     # temp1 = thread_ID - 3
+406 JIF $TEMP1 408                    # If thread_ID <= 3, continue
+407 SET 1 $STORE2                     # If thread_ID > 3, wrap to 1
 
-408 SET 0 $TEMP2                      # Initialize search counter
+408 SET 0 $STORE3                     # ✅ Use STORE3 for search counter (persistent)
 
 # Search loop for next ready thread
-409 CPY $TEMP2 $TEMP3                 # Copy search counter
-410 ADD $TEMP3 -3                     # Check if searched all 3 threads (1-3)
-411 JIF $TEMP3 413                    # If searched all, continue
+409 CPY $STORE3 $TEMP1                # Copy search counter
+410 ADD $TEMP1 -3                     # Check if searched all 3 threads
+411 JIF $TEMP1 413                    # If searched all, continue
 412 SET 470 $PC                       # If searched all, no ready thread found
 
 # Get thread state for current candidate
-413 CPY $TEMP1 $PARAM1                # Pass thread ID to get state
-414 CALL 600                          # Get thread state
-415 CPY $PARAM3 $TEMP5                # Get thread state result
+413 CPY $STORE2 $PARAM1               # Pass thread ID to get state
+414 CALL 600                          # ✅ SAFE: STORE2 preserved across call
+415 CPY $PARAM3 $STORE4               # ✅ Save state in STORE4 (persistent)
 
 # Check if thread state == READY (1) using proper equality test
-416 CPY $TEMP5 $TEMP6                 # Copy state
-417 ADD $TEMP6 -1                     # temp6 = state - 1
-418 JIF $TEMP6 420                    # If state <= 1, check second condition
-419 CPY 440 $PC                       # If state > 1, try next thread
+416 CPY $STORE4 $TEMP1                # Copy state
+417 ADD $TEMP1 -1                     # temp1 = state - 1
+418 JIF $TEMP1 420                    # If state <= 1, check second condition
+419 SET 440 $PC                       # If state > 1, try next thread
 
-# Second equality check: 1 - stateF
-420 SET 1 $STORE2                    # Load constant 1
-421 CPY $STORE2 $STORE3             # Copy constant
-422 SUBI $TEMP5 $STORE3              # store3 = 1 - state
-423 JIF $STORE3 425                  # If 1 - state <= 0 (state >= 1) = 1
-424 CPY 440 $PC                       # If state < 1 = 0, try next thread
-
-# THREAD_INACTIVE 0
-# THREAD_READY 1
-# THREAD_RUNNING 2
-# THREAD_BLOCKED 3
+# Second equality check: 1 - state
+420 SET 1 $TEMP2                      # Load constant 1
+421 SUBI $STORE4 $TEMP2               # temp2 = 1 - state
+422 JIF $TEMP2 425                    # If 1 - state <= 0 (state >= 1)
+423 SET 440 $PC                       # If state < 1, try next thread
 
 # Both conditions met: state == 1 (READY)
-425 CPY $TEMP1 @NEXT_THREAD           # Set next thread (found ready thread)
-426 CALL 700                          # Perform context switch
+425 CPY $STORE2 @NEXT_THREAD          # Set next thread (found ready thread)
+426 CALL 700                          # ✅ SAFE: STORE2 preserved across call
 427 SET 470 $PC                       # Jump to exit
 
 # Try next thread
-440 ADD $TEMP1 1                      # Increment THREAD ID (not search counter)
-441 CPY $TEMP1 $TEMP4                 # Copy thread ID
-442 ADD $TEMP4 -3                     # Check if > 3
-443 JIF $TEMP4 445                    # If > 3, wrap to 1
+440 ADD $STORE2 1                     # ✅ Increment thread ID (preserved)
+441 CPY $STORE2 $TEMP1                # Copy thread ID
+442 ADD $TEMP1 -3                     # Check if > 3
+443 JIF $TEMP1 445                    # If > 3, wrap to 1
 444 SET 450 $PC                       # Continue with current thread ID
 
-445 SET 1 $TEMP1                      # Wrap to thread 1
+445 SET 1 $STORE2                     # Wrap to thread 1
 
-450 ADD $TEMP2 1                      # Increment search counter
-451 CPY 409 $PC                       # Continue search loop
+450 ADD $STORE3 1                     # ✅ Increment search counter (preserved)
+451 SET 409 $PC                       # Continue search loop
 
-# Exit scheduler (no ready thread found or context switch completed)
-470 CPY $STORE1 $FP                  # Restore frame pointer
+# Exit scheduler
+470 CPY $STORE1 $FP                   # Restore frame pointer
 471 RET                               # Return
+
 
 
 # System Call Handler (Instructions 500-599)
