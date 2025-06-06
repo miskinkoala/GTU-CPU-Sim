@@ -817,17 +817,8 @@ Begin Instruction Section
 910 RET                               # Return
 
 
-
-
-
-
-
-
-
-
-
-# Thread 1: Bubble Sort (Instructions 1000-1199)
-@THREAD1_START SET 1002 $TEMP1        # Load array start address
+# Thread 1: Bubble Sort - FIXED FOR ARCHITECTURE
+@THREAD1_START SET 1002 $TEMP1        # Load array start address (1002)
 1001 CPY 1001 $TEMP2                  # Load array size (5)
 1002 SET 0 $TEMP3                     # Outer loop counter
 
@@ -835,46 +826,46 @@ Begin Instruction Section
 1003 CPY $TEMP3 $TEMP4                # Copy outer counter
 1004 CPY $TEMP2 $TEMP5                # Copy array size
 1005 ADD $TEMP5 -1                    # size - 1
-1006 ADD $TEMP4 -1                    # Check if outer >= size-1
-1007 SUBI $TEMP5 $TEMP4               # temp4 = (size-1) - outer
-1008 JIF $TEMP4 1080                  # Exit if done
+1006 SUBI $TEMP5 $TEMP4               # temp4 = (size-1) - outer (keep SUBI as is)
+1007 JIF $TEMP4 1080                  # Exit if outer >= size-1
 
-1009 SET 0 $TEMP6                     # Inner loop counter
+1008 SET 0 $TEMP6                     # Inner loop counter
 
 # Inner loop
-1010 CPY $TEMP6 $STORE15              # Copy inner counter
-1011 CPY $TEMP2 $STORE16              # Copy array size
-1012 ADD $STORE16 -1                  # size - 1
-1013 CPY $TEMP3 $STORE17              # Copy outer counter
-1014 ADD $STORE16 -1                  # (size-1) - outer
-1015 SUBI $STORE17 $STORE16           # temp = (size-1-outer) - inner
-1016 JIF $STORE16 1070                # Exit inner if done
+1009 CPY $TEMP6 $STORE1               # Copy inner counter
+1010 CPY $TEMP2 $STORE2               # Copy array size
+1011 ADD $STORE2 -1                   # size - 1
+1012 CPY $TEMP3 $STORE3               # Copy outer counter
+1013 SUBI $STORE2 $STORE3             # store2 = (size-1) - outer (keep SUBI as is)
+1014 SUBI $STORE2 $STORE1             # store2 = (size-1-outer) - inner (keep SUBI as is)
+1015 JIF $STORE2 1070                 # Exit inner if inner >= (size-1-outer)
 
 # Compare adjacent elements
-1017 CPY $TEMP1 $STORE17              # Copy array base
-1018 ADD $STORE17 $TEMP6              # Add inner counter
-1019 CPY $STORE17 $PARAM1             # Get arr[inner]
-1020 ADD $STORE17 1                   # Move to next element
-1021 CPY $STORE17 $PARAM2             # Get arr[inner+1]
+1016 CPY $TEMP1 $STORE3               # Copy array base
+1017 ADD $STORE3 $TEMP6               # Add inner counter
+1018 CPYI $STORE3 $PARAM1             # ✅ FIXED: Get arr[inner] using indirect copy
+1019 ADD $STORE3 1                    # Move to next element
+1020 CPYI $STORE3 $PARAM2             # ✅ FIXED: Get arr[inner+1] using indirect copy
 
 # Check if swap needed
-1022 CPY $PARAM1 $PARAM3              # Copy first element
-1023 SUBI $PARAM2 $PARAM3             # param3 = arr[inner] - arr[inner+1]
-1024 JIF $PARAM3 1060                 # If arr[inner] <= arr[inner+1], no swap
+1021 CPY $PARAM1 $PARAM3              # Copy first element
+1022 SUBI $PARAM2 $PARAM3             # param3 = arr[inner] - arr[inner+1] (keep SUBI as is)
+1023 JIF $PARAM3 1060                 # If arr[inner] <= arr[inner+1], no swap
 
 # Swap elements
-1025 CPY $TEMP1 $STORE17              # Array base
-1026 ADD $STORE17 $TEMP6              # Add inner counter
-1027 SET $PARAM2 $STORE17             # Store arr[inner+1] in arr[inner]
-1028 ADD $STORE17 1                   # Move to next
-1029 SET $PARAM1 $STORE17             # Store arr[inner] in arr[inner+1]
+1024 CPY $TEMP1 $STORE3               # Array base
+1025 ADD $STORE3 $TEMP6               # Add inner counter
+1026 SET $PARAM2 $STORE3              # Store arr[inner+1] in arr[inner]
+1027 ADD $STORE3 1                    # Move to next
+1028 SET $PARAM1 $STORE3              # Store arr[inner] in arr[inner+1]
 
 1060 ADD $TEMP6 1                     # Increment inner counter
-1061 SYSCALL YIELD                    # Yield CPU
-1062 CPY 1010 $PC                     # Continue inner loop
+1061 SYSCALL YIELD                    # ✅ Yield CPU for cooperative scheduling
+1062 SET 1009 $PC                     # Continue inner loop
 
 1070 ADD $TEMP3 1                     # Increment outer counter
-1071 CPY 1003 $PC                     # Continue outer loop
+1071 SYSCALL YIELD                    # ✅ Yield CPU between outer loop iterations
+1072 SET 1003 $PC                     # Continue outer loop
 
 # Print sorted array
 1080 SET 0 $TEMP3                     # Print counter
@@ -883,76 +874,82 @@ Begin Instruction Section
 1083 JIF $TEMP4 1090                  # Exit if done
 1084 CPY $TEMP1 $TEMP5                # Array base
 1085 ADD $TEMP5 $TEMP3                # Add counter
-1086 SYSCALL PRN $TEMP5               # Print element
-1087 ADD $TEMP3 1                     # Increment counter
-1088 CPY 1081 $PC                     # Continue printing
+1086 CPYI $TEMP5 $PARAM1              # ✅ FIXED: Get element using indirect copy
+1087 SYSCALL PRN $PARAM1              # ✅ FIXED: Print element value
+1088 ADD $TEMP3 1                     # Increment counter
+1089 SET 1081 $PC                     # Continue printing
 
 1090 SYSCALL HLT                      # Thread complete
 
-# Thread 2: Linear Search (Instructions 2000-2199)
-@THREAD2_START CPY 2001 $TEMP1        # Load array size
-2001 CPY 2002 $TEMP2                  # Load search key
-2002 SET 2003 $TEMP3                  # Array start address
+
+
+
+# Thread 2: Linear Search - FIXED FOR ARCHITECTURE
+@THREAD2_START CPY 2001 $TEMP1        # Load array size (5)
+2001 CPY 2002 $TEMP2                  # Load search key (25)
+2002 SET 2003 $TEMP3                  # Array start address (2003)
 2003 SET 0 $TEMP4                     # Search counter
 2004 SET -1 2008                      # Initialize result to -1 (not found)
 
 # Search loop
 2005 CPY $TEMP4 $TEMP5                # Copy counter
-2006 ADD $TEMP5 -5                    # Check if searched all 5 elements
-2007 JIF $TEMP5 2050                  # Exit if done
+2006 SUBI $TEMP1 $TEMP5               # temp5 = array_size - counter (keep SUBI as is)
+2007 JIF $TEMP5 2050                  # Exit if counter >= array_size
 
 2008 CPY $TEMP3 $TEMP6                # Copy array base
 2009 ADD $TEMP6 $TEMP4                # Add counter offset
-2010 CPY $TEMP6 $PARAM1               # Get current element
+2010 CPYI $TEMP6 $PARAM1              # ✅ FIXED: Get current element using indirect copy
 
 # Compare with key
 2011 CPY $PARAM1 $PARAM2              # Copy element
-2012 SUBI $TEMP2 $PARAM2              # param2 = key - element
+2012 SUBI $TEMP2 $PARAM2              # param2 = key - element (keep SUBI as is)
 2013 JIF $PARAM2 2040                 # If not equal, continue
 
 # Found element
 2014 SET $TEMP4 2008                  # Store found index
-2015 CPY 2050 $PC                     # Exit search
+2015 SET 2050 $PC                     # Exit search
 
 2040 ADD $TEMP4 1                     # Increment counter
-2041 SYSCALL YIELD                    # Yield CPU
-2042 CPY 2005 $PC                     # Continue search
+2041 SYSCALL YIELD                    # ✅ Yield CPU for cooperative scheduling
+2042 SET 2005 $PC                     # Continue search
 
-2050 SYSCALL PRN 2008                 # Print result
-2051 SYSCALL HLT                      # Thread complete
+2050 CPYI 2008 $PARAM1                # ✅ FIXED: Get result using indirect copy
+2051 SYSCALL PRN $PARAM1              # ✅ FIXED: Print result value
+2052 SYSCALL HLT                      # Thread complete
 
-# Thread 3: Factorial Calculator (Instructions 3000-3199)
+
+
+# Thread 3: Factorial Calculator - FIXED FOR ARCHITECTURE
 @THREAD3_START CPY 3001 $TEMP1        # Load factorial input (5)
 3001 SET 1 3002                       # Initialize result to 1
 3002 SET 1 $TEMP2                     # Initialize counter to 1
 
 # Factorial loop
 3003 CPY $TEMP2 $TEMP3                # Copy counter
-3004 ADD $TEMP3 -1                    # Check if counter > input
-3005 SUBI $TEMP1 $TEMP3               # temp3 = input - counter
-3006 JIF $TEMP3 3050                  # Exit if counter > input
+3004 SUBI $TEMP1 $TEMP3               # temp3 = input - counter (keep SUBI as is)
+3005 JIF $TEMP3 3050                  # Exit if counter > input
 
 # Multiply result by counter
-3007 CPY 3002 $TEMP4                  # Load current result
-3008 SET 0 $TEMP5                     # Initialize multiplication result
-3009 CPY $TEMP2 $TEMP6                # Copy counter for multiplication
+3006 CPYI 3002 $TEMP4                 # ✅ FIXED: Load current result using indirect copy
+3007 SET 0 $TEMP5                     # Initialize multiplication result
+3008 CPY $TEMP2 $TEMP6                # Copy counter for multiplication
 
 # Multiplication by addition loop
-3010 JIF $TEMP6 3030                  # Exit if multiplier = 0
-3011 ADD $TEMP5 $TEMP4                # Add result to accumulator
-3012 ADD $TEMP6 -1                    # Decrement multiplier
-3013 SYSCALL YIELD                    # Yield CPU during multiplication
-3014 CPY 3010 $PC                     # Continue multiplication
+3009 JIF $TEMP6 3030                  # Exit if multiplier = 0
+3010 ADD $TEMP5 $TEMP4                # Add result to accumulator
+3011 ADD $TEMP6 -1                    # Decrement multiplier
+3012 SYSCALL YIELD                    # ✅ Yield CPU during multiplication
+3013 SET 3009 $PC                     # Continue multiplication
 
 3030 SET $TEMP5 3002                  # Store multiplication result
 3031 ADD $TEMP2 1                     # Increment counter
-3032 SYSCALL YIELD                    # Yield CPU
-3033 CPY 3003 $PC                     # Continue factorial loop
+3032 SYSCALL YIELD                    # ✅ Yield CPU between factorial iterations
+3033 SET 3003 $PC                     # Continue factorial loop
 
-3050 SYSCALL PRN 3002                 # Print factorial result
-3051 SYSCALL HLT                      # Thread complete
+3050 CPYI 3002 $PARAM1                # ✅ FIXED: Get factorial result using indirect copy
+3051 SYSCALL PRN $PARAM1              # ✅ FIXED: Print factorial result value
+3052 SYSCALL HLT                      # Thread complete
 
-# Thread 4: Placeholder - Immediate HLT
-@THREAD4_START SYSCALL HLT            # Inactive thread
+
 
 End Instruction Section
