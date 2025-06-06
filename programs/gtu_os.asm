@@ -329,18 +329,20 @@ Begin Instruction Section
 112 ADD $TEMP1 -1                     # temp2 = OS_state - 2
 113 JIF $TEMP1 115                    # If OS_state < 2, continue
 114 SET 190 $PC                       # If OS_state >= 2, shutdown
-# Normal operation continues here
-115 CPY @COMPLETED_THREAD_COUNT $TEMP2 # Check thread completion
-116 CPY @ACTIVE_THREAD_COUNT $TEMP3   # Load active thread count
-117 CPY $TEMP2 $TEMP4                 # Copy completed count
-118 ADD $TEMP4 -3                     # Check if all threads done
-119 JIF $TEMP4 120                    # Jump to completion handler
-114 SET 180 $PC                       # If OS_state >= 2, shutdown
 
-120 CALL 400                          # Call scheduler
-121 CALL 500                          # Call system call handler
-122 ADD @SCHEDULER_COUNTER 1          # Increment scheduler counter
-123 SET 110 $PC                       # Loop back to start
+# Normal operation continues here
+115 CALL 350 
+116 CPY @COMPLETED_THREAD_COUNT $TEMP2 # Check thread completion
+117 CPY @ACTIVE_THREAD_COUNT $TEMP3   # Load active thread count
+118 CPY $TEMP2 $TEMP4                 # Copy completed count
+119 ADD $TEMP4 -3                     # Check if all threads done
+120 JIF $TEMP4 125                    # Jump to completion handler
+121 SET 180 $PC                       # If OS_state >= 2, shutdown
+
+125 CALL 400                          # Call scheduler
+126 CALL 500                          # Call system call handler
+127 ADD @SCHEDULER_COUNTER 1          # Increment scheduler counter
+128 SET 110 $PC                       # Loop back to start
 
 
 # All Threads Completed Handler (Instructions 180-189)
@@ -438,6 +440,60 @@ Begin Instruction Section
 
 
 
+
+
+# Check Blocked Threads for Unblocking (Instructions 350-399)
+350 CPY $FP $STORE1                   # Save frame pointer
+351 CPY $SP $FP                       # Set new frame pointer
+352 SET 1 $TEMP1                      # Start with thread 1
+353 SET 0 $TEMP2                      # Thread counter
+
+# Loop through threads 1-3
+354 CPY $TEMP2 $TEMP3                 # Copy counter
+355 ADD $TEMP3 -3                     # Check if checked all 3 threads
+356 JIF $TEMP3 390                    # Exit if done
+
+357 CPY $TEMP1 $PARAM1                # Pass thread ID
+358 CALL 600                          # Get thread state
+359 CPY $PARAM3 $TEMP4                # Get state
+360 ADD $TEMP4 -3                     # Check if BLOCKED (3)
+361 JIF $TEMP4 380                    # If not blocked, try next
+
+# Check if 100 instructions have passed
+362 CPY $TEMP1 $PARAM1                # Pass thread ID
+363 CALL 650                          # Get thread table base
+364 CPY $PARAM3 $TEMP5                # Get thread table base
+365 ADD $TEMP5 9                      # Move to unblock time field (offset 9)
+366 CPYI $TEMP5 $TEMP6                # Get unblock time
+367 CPY $INSTR_COUNT $STORE2          # Get current instruction count
+368 SUBI $TEMP6 $STORE2               # store2 = unblock_time - current_time
+369 JIF $STORE2 375                   # If current_time >= unblock_time, unblock
+370 SET 380 $PC                       # Not ready to unblock, try next
+
+# Unblock the thread
+375 CPY $PARAM3 $STORE3               # Get thread table base
+376 ADD $STORE3 3                     # Move to state field
+377 SET THREAD_READY $STORE3          # Set thread back to READY
+
+380 ADD $TEMP1 1                      # Increment thread ID
+381 CPY $TEMP1 $TEMP4                 # Copy thread ID
+382 ADD $TEMP4 -3                     # Check if > 3
+383 JIF $TEMP4 385                    # If > 3, wrap to 1
+384 SET 387 $PC                       # Continue
+
+385 SET 1 $TEMP1                      # Wrap to thread 1
+
+387 ADD $TEMP2 1                      # Increment counter
+388 SET 354 $PC                       # Continue loop
+
+390 CPY $STORE1 $FP                   # Restore frame pointer
+391 RET                               # Return
+
+
+
+
+
+
 # Round Robin Scheduler (Instructions 400-499) - ADJUSTED FOR YOUR REGISTER LAYOUT
 400 CPY $FP $STORE1                   # Save frame pointer
 401 CPY $SP $FP                       # Set new frame pointer
@@ -508,7 +564,7 @@ Begin Instruction Section
 
 505 CPY $TEMP1 $TEMP2                 # Copy system call type again
 506 ADD $TEMP2 -2                     # Check if YIELD (type 2)
-507 JIF $TEMP2 525                    # ✅ FIXED: Jump to actual YIELD handler
+507 JIF $TEMP2 530                    # ✅ FIXED: Jump to actual YIELD handler
 
 508 CPY $TEMP1 $TEMP2                 # Copy system call type again
 509 ADD $TEMP2 -3                     # Check if HLT (type 3)
@@ -522,12 +578,20 @@ Begin Instruction Section
 518 CPY $PARAM3 $TEMP1                # Get thread table base address
 519 ADD $TEMP1 3                      # Move to state field
 520 SET THREAD_BLOCKED $TEMP1         # Set thread to BLOCKED
-521 SET 1 @CONTEXT_SWITCH_FLAG        # Force context switch
-522 SET 550 $PC                       # Return
+# Record when blocking started (for 100 instruction countdown)
+521 CPY $PARAM3 $TEMP2                # Get thread table base again
+522 ADD $TEMP2 9                      # Move to reserved area (offset 9) for unblock time
+523 CPY $INSTR_COUNT $TEMP3           # Get current instruction count
+524 ADD $TEMP3 100                    # Add 100 instructions
+525 SET $TEMP3 $TEMP2                 # Store unblock time
+
+526 SET 1 @CONTEXT_SWITCH_FLAG        # Force context switch
+527 SET 550 $PC                       # Return
+
 
 # Handle YIELD system call
-525 SET 1 @CONTEXT_SWITCH_FLAG        # Set context switch flag
-526 SET 550 $PC                       # Return
+530 SET 1 @CONTEXT_SWITCH_FLAG        # Set context switch flag
+531 SET 550 $PC                       # Return
 
 # Handle HLT system call
 535 CALL 900                          # Mark thread as completed
@@ -536,25 +600,6 @@ Begin Instruction Section
 
 550 SET 0 $SYSCALL_RES                # Clear system call result
 551 RET                               # Return
-
-
-
-# Get Thread Table Base Helper (Instructions 650-699) - NEW FUNCTION
-650 CPY $PARAM1 $TEMP1                # Get thread ID
-651 SET @THREAD_TABLE_BASE $TEMP2     # Get thread table base (40)
-652 CPY $TEMP1 $TEMP3                 # Copy thread ID
-653 SET 0 $TEMP4                      # Initialize offset
-
-# Multiplication loop
-654 JIF $TEMP3 670                    # If thread ID = 0, skip multiplication
-655 ADD $TEMP4 THREAD_ENTRY_SIZE      # Add 10 to offset
-656 ADD $TEMP3 -1                     # Decrement thread ID counter
-657 SET 654 $PC                       # Loop back to check
-
-670 ADD $TEMP2 $TEMP4                 # Calculate thread entry base address
-671 CPY $TEMP2 $PARAM3                # Return base address in PARAM3
-672 RET                               # Return
-
 
 
 # Get Thread State Helper (Instructions 600-699) - ADJUSTED FOR YOUR REGISTER LAYOUT
@@ -574,6 +619,25 @@ Begin Instruction Section
 621 ADD $TEMP2 3                      # Move to state field (offset 3)
 622 CPYI $TEMP2 $PARAM3               # Get VALUE AT address using indirect copy
 623 RET                               # Return with state in PARAM3
+
+
+# Get Thread Table Base Helper (Instructions 650-699) - NEW FUNCTION
+650 CPY $PARAM1 $TEMP1                # Get thread ID
+651 SET @THREAD_TABLE_BASE $TEMP2     # Get thread table base (40)
+652 CPY $TEMP1 $TEMP3                 # Copy thread ID
+653 SET 0 $TEMP4                      # Initialize offset
+
+# Multiplication loop
+654 JIF $TEMP3 670                    # If thread ID = 0, skip multiplication
+655 ADD $TEMP4 THREAD_ENTRY_SIZE      # Add 10 to offset
+656 ADD $TEMP3 -1                     # Decrement thread ID counter
+657 SET 654 $PC                       # Loop back to check
+
+670 ADD $TEMP2 $TEMP4                 # Calculate thread entry base address
+671 CPY $TEMP2 $PARAM3                # Return base address in PARAM3
+672 RET                               # Return
+
+
 
 
 
@@ -604,7 +668,7 @@ Begin Instruction Section
 # Switch to user mode and jump to new thread
 727 CPY $STORE3 $TEMP2                # Copy new thread ID
 728 JIF $TEMP2 740                    # If thread 0 (OS), stay in kernel
-729 CALL 790                          # Switch to user mode for user threads
+729 CALL 850                           # Switch to user mode for user threads
 730 CPY 740 $PC                       # Jump to exit
 
 740 CPY $STORE1 $FP                   # Restore frame pointer
