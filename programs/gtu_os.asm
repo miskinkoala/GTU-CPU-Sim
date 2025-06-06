@@ -497,39 +497,48 @@ Begin Instruction Section
 471 RET                               # Return
 
 
-
-# System Call Handler (Instructions 500-599)
+# System Call Handler (Instructions 500-599) - ALTERNATIVE CLEAN FIX
 500 CPY $SYSCALL_RES $TEMP1           # Check if system call pending
 501 JIF $TEMP1 550                    # If no system call, return
 
 # Handle different system call types
 502 CPY $TEMP1 $TEMP2                 # Copy system call type
 503 ADD $TEMP2 -1                     # Check if PRN (type 1)
-504 JIF $TEMP2 510                    # Handle PRN
+504 JIF $TEMP2 515                    # ✅ FIXED: Jump to actual PRN handler
 
 505 CPY $TEMP1 $TEMP2                 # Copy system call type again
 506 ADD $TEMP2 -2                     # Check if YIELD (type 2)
-507 JIF $TEMP2 520                    # Handle YIELD
+507 JIF $TEMP2 525                    # ✅ FIXED: Jump to actual YIELD handler
 
 508 CPY $TEMP1 $TEMP2                 # Copy system call type again
 509 ADD $TEMP2 -3                     # Check if HLT (type 3)
-510 JIF $TEMP2 530                    # Handle HLT
-511 CPY 550 $PC                       # Unknown system call, return
+510 JIF $TEMP2 535                    # ✅ FIXED: Jump to actual HLT handler
+511 SET 550 $PC                       # Unknown system call, return
 
-# Handle PRN system call (already handled by CPU)
-515 CPY 550 $PC                       # Return
+# Handle PRN system call
+515 CPY @CURRENT_THREAD $STORE1       # Get current thread ID
+516 CPY $STORE1 $PARAM1               # Pass thread ID
+517 CALL 600                          # Get thread state helper
+518 CPY $PARAM3 $TEMP1                # Get thread table base
+519 ADD $TEMP1 3                      # Move to state field
+520 SET THREAD_BLOCKED $TEMP1         # Set thread to BLOCKED
+521 SET 1 @CONTEXT_SWITCH_FLAG        # Force context switch
+522 SET 550 $PC                       # Return
 
 # Handle YIELD system call
-520 SET 1 @CONTEXT_SWITCH_FLAG        # Set context switch flag
-521 CPY 550 $PC                       # Return
+525 SET 1 @CONTEXT_SWITCH_FLAG        # Set context switch flag
+526 SET 550 $PC                       # Return
 
 # Handle HLT system call
-530 CALL 800                          # Mark thread as completed
-531 SET 1 @CONTEXT_SWITCH_FLAG        # Force context switch
-532 SET 550 $PC                       # Return
+535 CALL 800                          # Mark thread as completed
+536 SET 1 @CONTEXT_SWITCH_FLAG        # Force context switch
+537 SET 550 $PC                       # Return
 
 550 SET 0 $SYSCALL_RES                # Clear system call result
 551 RET                               # Return
+
+
+
 
 # Get Thread State Helper (Instructions 600-699) - ADJUSTED FOR YOUR REGISTER LAYOUT
 600 CPY $PARAM1 $TEMP1                # Get thread ID
