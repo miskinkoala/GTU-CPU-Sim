@@ -15,10 +15,12 @@
 .define $PARAM3 12
 .define $ZERO 13
 .define $FP 14
-.define $STORE15 15
-.define $STORE16 16
-.define $STORE17 17
-.define $STORE18 18
+.define $STORE1 15
+.define $STORE2 16
+.define $STORE3 17
+.define $STORE4 18
+.define $FURETURN1 19
+
 
 
 # Memory Layout Constants
@@ -96,11 +98,11 @@ $PARAM2 0
 $PARAM3 0
 $ZERO 0
 $FP 0
-$STORE15 0
-$STORE16 0
-$STORE17 0
-$STORE18 0
-19 0
+$STORE1 0
+$STORE2 0
+$STORE3 0
+$STORE4 0
+$FURETURN1 0
 20 0
 
 # OS Data Area (21-999) - Kernel mode only
@@ -108,7 +110,7 @@ $STORE18 0
 @THREAD_COUNT MAX_THREADS
 @CURRENT_THREAD 0
 @SCHEDULER_COUNTER 0
-@OS_STATE 1
+@OS_STATE 0
 @CONTEXT_SWITCH_FLAG 0
 27 0
 28 @THREAD_TABLE_BASE
@@ -306,275 +308,386 @@ $STORE18 0
 
 End Data Section
 
+# GTU-C312 Operating System - Complete Implementation from Scratch
+# Using provided macros and data section
+
 Begin Instruction Section
+
 # OS Boot and Initialization (Instructions 100-199)
-100 SET 0 $ZERO
-101 SET 1 @OS_STATE
-102 SET 0 @CURRENT_THREAD
+100 SET 0 $ZERO                       # Initialize zero register
+101 SET 1 @OS_STATE                   # Set OS state to running
+102 SET 0 @CURRENT_THREAD             # Initialize current thread to OS (0)
+103 SET 0 @SCHEDULER_COUNTER          # Initialize scheduler counter
+104 SET 0 @CONTEXT_SWITCH_FLAG        # Initialize context switch flag
+105 CALL 200                          # Call thread table initialization
+106 SET 4 @ACTIVE_THREAD_COUNT        # Set active thread count (threads 1-4)
+107 SET 0 @COMPLETED_THREAD_COUNT     # Initialize completed thread count
+108 SET 110 $PC                       # Jump to main OS loop
 
+#OS state == 2 (shutdown) inti:0,running:1,shutdown:2
+# Main OS Loop (Instructions 110-179) - ALTERNATIVE
+110 CPY @OS_STATE $TEMP1              # Load OS state
+112 ADD $TEMP1 -1                     # temp2 = OS_state - 2
+113 JIF $TEMP1 115                    # If OS_state < 2, continue
+114 SET 190 $PC                       # If OS_state >= 2, shutdown
+# Normal operation continues here
+115 CPY @COMPLETED_THREAD_COUNT $TEMP2 # Check thread completion
+116 CPY @ACTIVE_THREAD_COUNT $TEMP3   # Load active thread count
+117 CPY $TEMP2 $TEMP4                 # Copy completed count
+118 ADD $TEMP4 -3                     # Check if all threads done
+119 JIF $TEMP4 120                    # Jump to completion handler
+114 SET 180 $PC                       # If OS_state >= 2, shutdown
 
-104 CALL 200
-105 SET 110 $PC
+120 CALL 400                          # Call scheduler
+121 CALL 500                          # Call system call handler
+122 ADD @SCHEDULER_COUNTER 1          # Increment scheduler counter
+123 SET 110 $PC                       # Loop back to start
 
-# Main OS Loop (Instructions 110-150)
-110 CPY @OS_STATE $TEMP1
-111 SUBI $SYSCALL_RES $TEMP1 #if sys call result = 1 then it will jump shutdown OS
-112 JIF $TEMP1 190
-113 CPY @COMPLETED_THREAD_COUNT $TEMP2
-114 SUBI @ACTIVE_THREAD_COUNT $TEMP2 #when compleated_thread_count - 4(@ACTIVE_THREAD_COUNT) == 0 jump thread complete scenerio
-115 JIF $TEMP2 180
-116 CALL 400
-117 CALL 500
-118 ADD @SCHEDULER_COUNTER 1
-119 SET 110 0
 
 # All Threads Completed Handler (Instructions 180-189)
-180 SET SENTINEL_DEAD $TEMP1
-181 SYSCALL PRN $TEMP1
-182 SET 2 @OS_STATE
-183 SET 190 0
+180 SET SENTINEL_DEAD $TEMP1          # Load completion sentinel
+181 SYSCALL PRN $TEMP1                # Print completion marker
+182 SET 2 @OS_STATE                   # Set OS state to shutdown
+183 SET 190 $PC                       # Jump to shutdown
 
 # OS Shutdown Sequence (Instructions 190-199)
-190 SET SENTINEL_BEEF $TEMP1
-191 SYSCALL PRN $TEMP1
-192 HLT
+190 SET SENTINEL_BEEF $TEMP1          # Load shutdown sentinel
+191 SYSCALL PRN $TEMP1                # Print shutdown marker
+192 HLT                               # Halt the system
 
-# Thread Table Initialization (Instructions 200-250) - FIXED
-# temp1: frame pointer, 
-#
-200 CPY $FP $TEMP1
-201 CPY $SP $FP
-202 CPY @THREAD_TABLE_BASE $TEMP2
-203 SET 0 $TEMP3              # Initialize counter to 0
-204 CPY @THREAD_COUNT $TEMP4  # Load thread count
-205 SUBI $TEMP3 $TEMP4        # temp4 = thread_count - counter
-206 JIF $TEMP4 250            # Exit if thread_count - counter <= 0 (i.e., counter >= thread_count)
-207 CPY $TEMP2 $PARAM1
-208 CPY $TEMP3 $PARAM2
-209 CALL 260
-210 ADD $TEMP2 THREAD_ENTRY_SIZE
-211 ADD $TEMP3 1              # Increment counter
-212 SET 204 0                 # Jump back to loop condition
-250 CPY $TEMP1 $FP
-251 RET
+# Thread Table Initialization (Instructions 200-299)
+200 CPY $FP $STORE1                  # Save frame pointer
+201 CPY $SP $FP                       # Set new frame pointer
+202 SET @THREAD_TABLE_BASE $TEMP1     # Load thread table base
+203 SET 0 $TEMP2                      # Initialize counter
 
-# Thread Initialization Helper (Instructions 260-290)
-#$PARAM1 (register 10): Pointer to the thread 
-#$PARAM2 (register 11): Thread ID (0 for OS, 1-3 for user threads)
-260 CPY $PARAM1 $TEMP2        # Copy thread table pointer
-261 CPY $PARAM2 $TEMP3        # Copy thread ID
-262 CPY $TEMP3 $TEMP2
-263 ADD $TEMP2 1              # Move to starting time field
-264 CPY $INSTR_COUNT $TEMP4   # Get current instruction count
-265 CPY $TEMP4 $TEMP2         # ✅ FIXED - Copy instruction count to memory
-266 ADD $TEMP2 2              # Move to instructions used field
-267 SET 0 $TEMP2              # ✅ CORRECT - Set constant 0
-268 ADD $TEMP2 1              # Move to state field
-269 CPY $TEMP3 $TEMP4         # Copy thread ID
-270 JIF $TEMP4 280            # If thread ID = 0, jump to set RUNNING
-271 CPY $TEMP3 $TEMP5         # Copy thread ID
-272 SUBI @THREAD_COUNT $TEMP5  # Calculate: 3 - thread_ID
-273 JIF $TEMP5 285            # If thread_ID > 3, jump to set INACTIVE
-274 SET THREAD_READY $TEMP2   # ✅ CORRECT - THREAD_READY is constant (1)
-275 SET 290 0                 # Jump to return
-280 SET THREAD_RUNNING $TEMP2 # ✅ CORRECT - THREAD_RUNNING is constant (2)
-281 SET 290 0                 # Jump to return
-285 SET THREAD_INACTIVE $TEMP2 # ✅ CORRECT - THREAD_INACTIVE is constant (0)
-290 RET
+# Thread initialization loop
+204 CPY $TEMP2 $TEMP3                 # Copy counter
+205 ADD $TEMP3 -11                    # Check if counter >= 11 (MAX_THREADS)
+206 JIF $TEMP3 250                    # Exit if done
+
+207 CPY $TEMP1 $PARAM1                # Pass thread table pointer
+208 CPY $TEMP2 $PARAM2                # Pass thread ID
+209 CALL 260                          # Call thread initialization helper
+
+210 ADD $TEMP1 THREAD_ENTRY_SIZE      # Move to next thread entry
+211 ADD $TEMP2 1                      # Increment counter
+212 CPY 204 $PC                       # Loop back
+
+250 CPY $STORE15 $FP                  # Restore frame pointer
+251 RET                               # Return
+
+# Thread Initialization Helper (Instructions 260-299)
+260 CPY $PARAM1 $TEMP1                # Get thread table pointer
+261 CPY $PARAM2 $TEMP2                # Get thread ID
+
+# Store thread ID
+262 SET $TEMP2 $TEMP1                 # Store thread ID at offset 0
+263 ADD $TEMP1 1                      # Move to starting time field
+
+# Store starting time
+264 CPY $INSTR_COUNT $TEMP3           # Get current instruction count
+265 SET $TEMP3 $TEMP1                 # Store starting time at offset 1
+266 ADD $TEMP1 1                      # Move to instructions used field
+
+# Initialize instructions used
+267 SET 0 $TEMP1                      # Set instructions used to 0
+268 ADD $TEMP1 1                      # Move to state field
+
+# Set thread state based on ID
+269 CPY $TEMP2 $TEMP3                 # Copy thread ID
+270 JIF $TEMP3 280                    # If thread 0 (OS), set running
+
+# Check if valid user thread (1-4)
+271 CPY $TEMP2 $TEMP4                 # Copy thread ID
+272 ADD $TEMP4 -4                     # Check if thread ID > 4
+273 JIF $TEMP4 285                    # If > 4, set inactive
+
+# Valid user thread (1-4), set ready
+274 SET THREAD_READY $TEMP1           # Set state to ready
+275 CALL 290                          # Set PC and SP for user thread
+276 CPY 299 $PC                       # Jump to return
+
+# OS thread (0), set running
+280 SET THREAD_RUNNING $TEMP1         # Set state to running
+281 ADD $TEMP1 1                      # Move to PC field
+282 SET 100 $TEMP1                    # Set PC to OS start
+283 ADD $TEMP1 1                      # Move to SP field
+284 SET 1000 $TEMP1                   # Set SP for OS
+285 CPY 299 $PC                       # Jump to return
+
+# Inactive thread (>4), set inactive
+286 SET THREAD_INACTIVE $TEMP1        # Set state to inactive
+287 ADD $TEMP1 1                      # Move to PC field
+288 SET 0 $TEMP1                      # Set PC to 0
+289 CPY 299 $PC                       # Jump to return
+
+# Set PC and SP for user threads
+290 ADD $TEMP1 1                      # Move to PC field
+291 CPY $TEMP2 $TEMP3                 # Copy thread ID
+292 SET 1000 $TEMP4                   # Base address
+293 CPY $TEMP3 $TEMP5                 # Copy thread ID
+294 ADD $TEMP5 $TEMP5                 # thread_ID * 2
+295 ADD $TEMP5 $TEMP5                 # thread_ID * 4  
+296 ADD $TEMP5 $TEMP5                 # thread_ID * 8
+297 ADD $TEMP4 $TEMP5                 # Approximate thread_ID * 1000
+298 SET $TEMP4 $TEMP1                 # Store PC
+299 ADD $TEMP1 1                      # Move to SP field
+300 ADD $TEMP4 999                    # Calculate end of thread area
+301 SET $TEMP4 $TEMP1                 # Store SP
+302 RET                               # Return
+
+# Round Robin Scheduler (Instructions 400-499)
+400 CPY $FP $STORE1                  # Save frame pointer
+401 CPY $SP $FP                       # Set new frame pointer
+
+# Find next ready thread
+402 CPY @CURRENT_THREAD $TEMP1        # Get current thread
+403 SET 1 $TEMP1                      # Start search from thread 1
+404 SET 0 $TEMP2                      # Search counter
+
+# Search loop for next ready thread
+405 CPY $TEMP2 $TEMP3                 # Copy search counter
+
+406 ADD $TEMP3 -3                     # Check if searched all 4 threads
+407 JIF $TEMP3 409
+408 SET $PC 450                       # If searched all, no ready thread
+
+409 CPY $TEMP1 $PARAM1                # Pass thread ID to get state
+410 CALL 600                          # Get thread state
+411 CPY $PARAM3 $TEMP5                # Get thread state result
+412 ADD $TEMP5 -1                     # Check if state == READY 0,1,2,3 
+# THREAD_INACTIVE 0
+# THREAD_READY 1
+# THREAD_RUNNING 2
+# THREAD_BLOCKED 3
+413 JIF $TEMP5 420                    # If not ready, try next
+
+# Found ready thread, switch to it
+413 CPY $TEMP2 @NEXT_THREAD           # Set next thread
+414 CALL 700                          # Perform context switch
+415 CPY 450 $PC                       # Jump to exit
+
+# Try next thread
+420 ADD $TEMP2 1                      # Increment thread ID
+421 CPY $TEMP2 $TEMP6                 # Copy thread ID
+422 ADD $TEMP6 -4                     # Check if > 4
+423 JIF $TEMP6 425                    # If > 4, wrap to 1
+424 CPY 430 $PC                       # Continue search
+425 SET 1 $TEMP2                      # Wrap to thread 1
+
+430 ADD $TEMP3 1                      # Increment search counter
+431 CPY 405 $PC                       # Continue search loop
+
+450 CPY $STORE16 $FP                  # Restore frame pointer
+451 RET                               # Return
+
+# System Call Handler (Instructions 500-599)
+500 CPY $SYSCALL_RES $TEMP1           # Check if system call pending
+501 JIF $TEMP1 550                    # If no system call, return
+
+# Handle different system call types
+502 CPY $TEMP1 $TEMP2                 # Copy system call type
+503 ADD $TEMP2 -1                     # Check if PRN (type 1)
+504 JIF $TEMP2 510                    # Handle PRN
+
+505 CPY $TEMP1 $TEMP2                 # Copy system call type again
+506 ADD $TEMP2 -2                     # Check if YIELD (type 2)
+507 JIF $TEMP2 520                    # Handle YIELD
+
+508 CPY $TEMP1 $TEMP2                 # Copy system call type again
+509 ADD $TEMP2 -3                     # Check if HLT (type 3)
+510 JIF $TEMP2 530                    # Handle HLT
+511 CPY 550 $PC                       # Unknown system call, return
+
+# Handle PRN system call (already handled by CPU)
+515 CPY 550 $PC                       # Return
+
+# Handle YIELD system call
+520 SET 1 @CONTEXT_SWITCH_FLAG        # Set context switch flag
+521 CPY 550 $PC                       # Return
+
+# Handle HLT system call
+530 CALL 800                          # Mark thread as completed
+531 SET 1 @CONTEXT_SWITCH_FLAG        # Force context switch
+532 CPY 550 $PC                       # Return
+
+550 SET 0 $SYSCALL_RES                # Clear system call result
+551 RET                               # Return
+
+# Get Thread State Helper (Instructions 600-699) - COMPLETELY FIXED
+600 CPY $PARAM1 $TEMP1                # Get thread ID
+601 SET @THREAD_TABLE_BASE $TEMP2     # Get thread table base address (40)
+602 CPY $TEMP1 $TEMP3                 # Copy thread ID
+603 SET 0 $TEMP4                      # Initialize offset to 0
+
+# Calculate thread table offset (thread_ID * THREAD_ENTRY_SIZE)
+# Simple multiplication loop: offset = thread_ID * 10
+604 JIF $TEMP3 620                    # If thread ID = 0, skip multiplication
+605 ADD $TEMP4 THREAD_ENTRY_SIZE      # Add 10 to offset
+606 ADD $TEMP3 -1                     # Decrement thread ID counter
+607 SET 604 $PC                       # Loop back to check
+
+# Calculate final address and get state
+620 ADDI $TEMP2 $TEMP4                 # Add offset to base (base + thread_ID*10)
+621 ADD $TEMP2 3                      # Move to state field (offset 3)
+622 CPY $TEMP2 $PARAM3               # ✅ FIXED: Get VALUE AT address, not address itself
+623 RET                               # Return with state in PARAM3
 
 
-# Main Scheduler (Instructions 400-450)
-400 CPY $FP $TEMP1
-401 CPY $SP $FP
-402 CPY @CURRENT_THREAD $TEMP2
-403 JIF $TEMP2 420
-404 SET 450 0
-420 CALL 600
-421 CPY @NEXT_THREAD $TEMP3
-422 JIF $TEMP3 450
-423 SET $TEMP3 @CURRENT_THREAD
-424 CALL 700
-450 CPY $TEMP1 $FP
-451 RET
+# Context Switch (Instructions 700-799)
+700 CPY $FP $STORE17                  # Save frame pointer
+701 CPY $SP $FP                       # Set new frame pointer
 
-# System Call Handler (Instructions 500-550)
-500 CPY $SYSCALL_RES $PARAM1
-501 JIF $PARAM1 550
-502 CPY $PARAM1 $TEMP1
-503 SUBI 1 $TEMP1
-504 JIF $TEMP1 510
-505 ADD $TEMP1 1
-506 SUBI 2 $TEMP1
-507 JIF $TEMP1 520
-508 ADD $TEMP1 2
-509 SUBI 3 $TEMP1
-510 JIF $TEMP1 530
-511 SET 550 0
-512 SET 100 $PARAM2
-513 SET 550 0
-520 SET 1 @CONTEXT_SWITCH_FLAG
-521 SET 0 @CURRENT_THREAD
-522 SET 550 0
-530 CALL 800
-531 SET 550 0
-550 SET 0 $SYSCALL_RES
-551 RET
+# Save current thread context
+702 CPY @CURRENT_THREAD $PARAM1       # Get current thread ID
+703 CALL 600                          # Get thread table entry
+704 # Context saving would go here (simplified for now)
 
-# Find Next Ready Thread (Instructions 600-650)
-600 CPY 30 $TEMP1
-601 ADD $TEMP1 1
-602 CPY $TEMP1 $TEMP2
-603 SUBI 3 $TEMP2
-604 JIF $TEMP2 610
-605 SET 620 0
-610 SET 1 $TEMP1
-620 SET @THREAD_TABLE_BASE $TEMP2
-621 CPY $TEMP1 $TEMP3
-622 CALL 850
-623 CPY $PARAM3 $TEMP4
-624 ADD $TEMP4 3
-625 CPY $TEMP4 $TEMP5
-626 SUBI THREAD_READY $TEMP5
-627 JIF $TEMP5 640
-628 ADD $TEMP1 1
-629 CPY $TEMP1 $TEMP6
-630 SUBI 3 $TEMP6
-631 JIF $TEMP6 635
-632 SET 622 0
-635 SET 1 $TEMP1
-636 SET 622 0
-640 SET $TEMP1 30
-641 SET $TEMP1 @NEXT_THREAD
-650 RET
+# Switch to next thread
+705 CPY @NEXT_THREAD @CURRENT_THREAD  # Update current thread
+706 CPY @CURRENT_THREAD $PARAM1       # Get new thread ID
+707 CALL 750                          # Load new thread context
 
-# Context Switch (Instructions 700-750)
-700 CPY $FP $TEMP1
-701 CPY $SP $FP
-702 CPY @CURRENT_THREAD $TEMP2
-703 CPY $TEMP2 $PARAM1
-704 CALL 850
-705 CPY $PARAM3 $TEMP3
-706 ADD $TEMP3 4
-707 CPY $PC $TEMP4
-708 SET $TEMP4 $TEMP3
-709 ADD $TEMP3 1
-710 CPY $SP $TEMP5
-711 SET $TEMP5 $TEMP3
-712 CPY @NEXT_THREAD $TEMP2
-713 SET $TEMP2 @CURRENT_THREAD
-714 CPY $TEMP2 $PARAM1
-715 CALL 850
-716 CPY $PARAM3 $TEMP3
-717 ADD $TEMP3 4
-718 CPY $TEMP3 $TEMP4
-719 SET $TEMP4 $PC
-720 ADD $TEMP3 1
-721 CPY $TEMP3 $TEMP5
-722 SET $TEMP5 $SP
-723 USER @THREAD1_START
-750 RET
+750 CPY $STORE17 $FP                  # Restore frame pointer
+751 RET                               # Return
 
-# Thread Completion Handler (Instructions 800-830)
-800 CPY @CURRENT_THREAD $TEMP1
-801 CPY $TEMP1 $PARAM1
-802 CALL 850
-803 CPY $PARAM3 $TEMP2
-804 ADD $TEMP2 3
-805 SET THREAD_INACTIVE $TEMP2
-806 ADD @COMPLETED_THREAD_COUNT 1
-807 SET 0 @CURRENT_THREAD
-808 RET
+# Thread Completion Handler (Instructions 800-899)
+800 CPY @CURRENT_THREAD $PARAM1       # Get current thread ID
+801 CALL 600                          # Get thread table entry
+802 # Mark thread as inactive
+803 SET THREAD_INACTIVE $PARAM3       # Set state to inactive
+804 ADD @COMPLETED_THREAD_COUNT 1     # Increment completed count
+805 SET 0 @CURRENT_THREAD             # Reset current thread to OS
+806 RET                               # Return
 
-# Calculate Thread Address Helper (Instructions 850-870)
-850 SET @THREAD_TABLE_BASE $PARAM2
-851 CPY $PARAM1 $PARAM3
-852 ADD $PARAM3 $PARAM3
-853 ADD $PARAM3 $PARAM3
-854 ADD $PARAM3 $PARAM3
-855 ADD $PARAM3 $PARAM3
-856 ADD $PARAM3 $PARAM3
-857 ADD $PARAM2 $PARAM3
-858 RET
+# Thread 1: Bubble Sort (Instructions 1000-1199)
+@THREAD1_START SET 1002 $TEMP1        # Load array start address
+1001 CPY 1001 $TEMP2                  # Load array size (5)
+1002 SET 0 $TEMP3                     # Outer loop counter
 
-# Thread 1: Bubble Sort Implementation (Instructions 1000-1100)
-@THREAD1_START SET 1002 $TEMP1
-1001 CPY 1001 $TEMP2
-1002 SET 0 1008
-1003 CPY 1008 $TEMP3
-1004 SUBI $TEMP2 $TEMP3
-1005 JIF $TEMP3 1080
-1006 SET 0 1009
-1007 CPY 1009 $TEMP4
-1008 CPY $TEMP2 $TEMP5
-1009 SUBI $TEMP5 1008
-1010 SUBI $TEMP5 $TEMP4
-1011 JIF $TEMP5 1070
-1012 CPY $TEMP1 $TEMP6
-1013 ADD $TEMP6 $TEMP4
-1014 CPY $TEMP6 $PARAM1
-1015 ADD $TEMP6 1
-1016 CPY $TEMP6 $PARAM2
-1017 CPY $PARAM1 $PARAM3
-1018 SUBI $PARAM2 $PARAM3
-1019 JIF $PARAM3 1065
-1020 SET $PARAM2 $TEMP6
-1021 SUBI $TEMP6 1
-1022 SET $PARAM1 $TEMP6
-1065 ADD 1009 1
-1066 SYSCALL YIELD
-1067 SET 1007 0
-1070 ADD 1008 1
-1071 SET 1003 0
-1080 SYSCALL PRN 1002
-1081 SYSCALL PRN 1003
-1082 SYSCALL PRN 1004
-1083 SYSCALL PRN 1005
-1084 SYSCALL PRN 1006
-1085 SYSCALL HLT
+# Outer loop
+1003 CPY $TEMP3 $TEMP4                # Copy outer counter
+1004 CPY $TEMP2 $TEMP5                # Copy array size
+1005 ADD $TEMP5 -1                    # size - 1
+1006 ADD $TEMP4 -1                    # Check if outer >= size-1
+1007 SUBI $TEMP5 $TEMP4               # temp4 = (size-1) - outer
+1008 JIF $TEMP4 1080                  # Exit if done
 
-# Thread 2: Linear Search Implementation (Instructions 2000-2100)
-@THREAD2_START SET 2003 $TEMP1
-2001 CPY 2001 $TEMP2
-2002 CPY 2002 $TEMP3
-2003 SET 0 2009
-2004 SET -1 2008
-2005 CPY 2009 $TEMP4
-2006 SUBI $TEMP2 $TEMP4
-2007 JIF $TEMP4 2090
-2008 CPY $TEMP1 $TEMP5
-2009 ADD $TEMP5 $TEMP4
-2010 CPY $TEMP5 $TEMP6
-2011 CPY $TEMP3 $PARAM1
-2012 SUBI $PARAM1 $TEMP6
-2013 JIF $PARAM1 2080
-2014 ADD 2009 1
-2015 SYSCALL YIELD
-2016 SET 2005 0
-2080 SET 2009 2008
-2090 SYSCALL PRN 2008
-2091 SYSCALL HLT
+1009 SET 0 $TEMP6                     # Inner loop counter
 
-# Thread 3: Factorial Calculator (Instructions 3000-3100)
-@THREAD3_START CPY 3001 $TEMP1
-3001 SET 1 3002
-3002 SET 1 3003
-3003 CPY 3003 $TEMP2
-3004 SUBI $TEMP1 $TEMP2
-3005 JIF $TEMP2 3090
-3006 CPY 3002 $TEMP3
-3007 CPY 3003 $TEMP4
-3008 CALL 3050
-3009 CPY $PARAM3 3002
-3010 ADD 3003 1
-3011 SYSCALL YIELD
-3012 SET 3003 0
-3050 SET 0 $PARAM3
-3051 JIF $TEMP4 3070
-3052 ADD $PARAM3 $TEMP3
-3053 ADD $TEMP4 -1
-3054 SET 3051 0
-3070 RET
-3090 SYSCALL PRN 3002
-3091 SYSCALL HLT
+# Inner loop
+1010 CPY $TEMP6 $STORE15              # Copy inner counter
+1011 CPY $TEMP2 $STORE16              # Copy array size
+1012 ADD $STORE16 -1                  # size - 1
+1013 CPY $TEMP3 $STORE17              # Copy outer counter
+1014 ADD $STORE16 -1                  # (size-1) - outer
+1015 SUBI $STORE17 $STORE16           # temp = (size-1-outer) - inner
+1016 JIF $STORE16 1070                # Exit inner if done
+
+# Compare adjacent elements
+1017 CPY $TEMP1 $STORE17              # Copy array base
+1018 ADD $STORE17 $TEMP6              # Add inner counter
+1019 CPY $STORE17 $PARAM1             # Get arr[inner]
+1020 ADD $STORE17 1                   # Move to next element
+1021 CPY $STORE17 $PARAM2             # Get arr[inner+1]
+
+# Check if swap needed
+1022 CPY $PARAM1 $PARAM3              # Copy first element
+1023 SUBI $PARAM2 $PARAM3             # param3 = arr[inner] - arr[inner+1]
+1024 JIF $PARAM3 1060                 # If arr[inner] <= arr[inner+1], no swap
+
+# Swap elements
+1025 CPY $TEMP1 $STORE17              # Array base
+1026 ADD $STORE17 $TEMP6              # Add inner counter
+1027 SET $PARAM2 $STORE17             # Store arr[inner+1] in arr[inner]
+1028 ADD $STORE17 1                   # Move to next
+1029 SET $PARAM1 $STORE17             # Store arr[inner] in arr[inner+1]
+
+1060 ADD $TEMP6 1                     # Increment inner counter
+1061 SYSCALL YIELD                    # Yield CPU
+1062 CPY 1010 $PC                     # Continue inner loop
+
+1070 ADD $TEMP3 1                     # Increment outer counter
+1071 CPY 1003 $PC                     # Continue outer loop
+
+# Print sorted array
+1080 SET 0 $TEMP3                     # Print counter
+1081 CPY $TEMP3 $TEMP4                # Copy counter
+1082 ADD $TEMP4 -5                    # Check if printed all 5
+1083 JIF $TEMP4 1090                  # Exit if done
+1084 CPY $TEMP1 $TEMP5                # Array base
+1085 ADD $TEMP5 $TEMP3                # Add counter
+1086 SYSCALL PRN $TEMP5               # Print element
+1087 ADD $TEMP3 1                     # Increment counter
+1088 CPY 1081 $PC                     # Continue printing
+
+1090 SYSCALL HLT                      # Thread complete
+
+# Thread 2: Linear Search (Instructions 2000-2199)
+@THREAD2_START CPY 2001 $TEMP1        # Load array size
+2001 CPY 2002 $TEMP2                  # Load search key
+2002 SET 2003 $TEMP3                  # Array start address
+2003 SET 0 $TEMP4                     # Search counter
+2004 SET -1 2008                      # Initialize result to -1 (not found)
+
+# Search loop
+2005 CPY $TEMP4 $TEMP5                # Copy counter
+2006 ADD $TEMP5 -5                    # Check if searched all 5 elements
+2007 JIF $TEMP5 2050                  # Exit if done
+
+2008 CPY $TEMP3 $TEMP6                # Copy array base
+2009 ADD $TEMP6 $TEMP4                # Add counter offset
+2010 CPY $TEMP6 $PARAM1               # Get current element
+
+# Compare with key
+2011 CPY $PARAM1 $PARAM2              # Copy element
+2012 SUBI $TEMP2 $PARAM2              # param2 = key - element
+2013 JIF $PARAM2 2040                 # If not equal, continue
+
+# Found element
+2014 SET $TEMP4 2008                  # Store found index
+2015 CPY 2050 $PC                     # Exit search
+
+2040 ADD $TEMP4 1                     # Increment counter
+2041 SYSCALL YIELD                    # Yield CPU
+2042 CPY 2005 $PC                     # Continue search
+
+2050 SYSCALL PRN 2008                 # Print result
+2051 SYSCALL HLT                      # Thread complete
+
+# Thread 3: Factorial Calculator (Instructions 3000-3199)
+@THREAD3_START CPY 3001 $TEMP1        # Load factorial input (5)
+3001 SET 1 3002                       # Initialize result to 1
+3002 SET 1 $TEMP2                     # Initialize counter to 1
+
+# Factorial loop
+3003 CPY $TEMP2 $TEMP3                # Copy counter
+3004 ADD $TEMP3 -1                    # Check if counter > input
+3005 SUBI $TEMP1 $TEMP3               # temp3 = input - counter
+3006 JIF $TEMP3 3050                  # Exit if counter > input
+
+# Multiply result by counter
+3007 CPY 3002 $TEMP4                  # Load current result
+3008 SET 0 $TEMP5                     # Initialize multiplication result
+3009 CPY $TEMP2 $TEMP6                # Copy counter for multiplication
+
+# Multiplication by addition loop
+3010 JIF $TEMP6 3030                  # Exit if multiplier = 0
+3011 ADD $TEMP5 $TEMP4                # Add result to accumulator
+3012 ADD $TEMP6 -1                    # Decrement multiplier
+3013 SYSCALL YIELD                    # Yield CPU during multiplication
+3014 CPY 3010 $PC                     # Continue multiplication
+
+3030 SET $TEMP5 3002                  # Store multiplication result
+3031 ADD $TEMP2 1                     # Increment counter
+3032 SYSCALL YIELD                    # Yield CPU
+3033 CPY 3003 $PC                     # Continue factorial loop
+
+3050 SYSCALL PRN 3002                 # Print factorial result
+3051 SYSCALL HLT                      # Thread complete
+
+# Thread 4: Placeholder - Immediate HLT
+@THREAD4_START SYSCALL HLT            # Inactive thread
 
 End Instruction Section
