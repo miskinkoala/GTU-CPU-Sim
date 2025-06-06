@@ -531,24 +531,24 @@ Begin Instruction Section
 550 SET 0 $SYSCALL_RES                # Clear system call result
 551 RET                               # Return
 
-# Get Thread State Helper (Instructions 600-699) - COMPLETELY FIXED
+# Get Thread State Helper (Instructions 600-699) - ADJUSTED FOR YOUR REGISTER LAYOUT
 600 CPY $PARAM1 $TEMP1                # Get thread ID
 601 SET @THREAD_TABLE_BASE $TEMP2     # Get thread table base address (40)
 602 CPY $TEMP1 $TEMP3                 # Copy thread ID
 603 SET 0 $TEMP4                      # Initialize offset to 0
 
 # Calculate thread table offset (thread_ID * THREAD_ENTRY_SIZE)
-# Simple multiplication loop: offset = thread_ID * 10
 604 JIF $TEMP3 620                    # If thread ID = 0, skip multiplication
 605 ADD $TEMP4 THREAD_ENTRY_SIZE      # Add 10 to offset
 606 ADD $TEMP3 -1                     # Decrement thread ID counter
 607 SET 604 $PC                       # Loop back to check
 
 # Calculate final address and get state
-620 ADDI $TEMP2 $TEMP4                 # Add offset to base (base + thread_ID*10)
+620 ADDI $TEMP2 $TEMP4                # Add offset to base (base + thread_ID*10)
 621 ADD $TEMP2 3                      # Move to state field (offset 3)
-622 CPY $TEMP2 $PARAM3               # ✅ FIXED: Get VALUE AT address, not address itself
+622 CPYI $TEMP2 $PARAM3               # Get VALUE AT address using indirect copy
 623 RET                               # Return with state in PARAM3
+
 
 
 # Context Switch (Instructions 700-799)
