@@ -119,7 +119,7 @@ $STORE4 0
 
 
 # Offset 9:  UNBLOCK TIME
-#ID:1 starting time:2 how many execution:3 so far in the thread:4 state:5, PC:6, SP:7, FP:8,
+#ID:0 starting time:1 how many execution so far in the thread:2 status:3, PC:4, SP:5, FP:6, Res_R:7 $STORE1, Res_R:8 $STORE2  unblocking_time:9
 # Thread Table Structure (4 threads * 10 words each)
 # Thread 0 (OS itself)
 #######THREAD TABLE#######
@@ -336,7 +336,7 @@ Begin Instruction Section
 116 CPY @COMPLETED_THREAD_COUNT $TEMP2 # Check thread completion
 117 CPY @ACTIVE_THREAD_COUNT $TEMP3   # Load active thread count
 118 CPY $TEMP2 $TEMP4                 # Copy completed count
-119 ADD $TEMP4 -3                     # Check if all threads done
+119 ADD $TEMP4 -2                     # Check if all threads done CHANGED FROM 3 to 2 !!
 120 JIF $TEMP4 125                    # Jump to completion handler
 121 SET 180 $PC                       # If OS_state >= 2, shutdown
 
@@ -429,7 +429,7 @@ Begin Instruction Section
 404 CPY $STORE2 $TEMP1                # Check if thread > 3
 405 ADD $TEMP1 -3                     # temp1 = thread_ID - 3
 406 JIF $TEMP1 408                    # If thread_ID <= 3, continue
-407 SET 1 $STORE2                     # If thread_ID > 3, wrap to 1
+407 SET 1 $STORE2                     # If thread_ID > 3, wrap to 1 TODO: 3 BLOCK CONDITION
 
 408 SET 0 $STORE3                     # ✅ Use STORE3 for search counter (persistent)
 
@@ -453,7 +453,7 @@ Begin Instruction Section
 # Second equality check: 1 - state
 420 SET 1 $TEMP2                      # Load constant 1
 421 SUBI $STORE4 $TEMP2               # temp2 = 1 - state
-422 JIF $TEMP2 425                    # If 1 - state <= 0 (state >= 1)
+422 JIF $TEMP2 425                    # If 1 - state <= 0 (state >= 1) = ! READY
 423 SET 440 $PC                       # If state < 1, try next thread
 
 # Both conditions met: state == 1 (READY)
@@ -572,7 +572,7 @@ Begin Instruction Section
 
 # Get current thread ID and validate
 702 CPY @CURRENT_THREAD $STORE2       # Get current thread ID
-703 JIF $STORE2 720                   # If current thread = 0 (OS), skip saving
+703 JIF $STORE2 720                   # If current thread = 0 (OS), skip saving OS NOT SAVED PROBLEM
 
 # Save current thread context
 704 CPY $STORE2 $PARAM1               # Pass current thread ID
@@ -587,130 +587,112 @@ Begin Instruction Section
 722 CPY $STORE3 $PARAM1               # Pass new thread ID
 723 CALL 800                          # ✅ FIXED: Call correct load helper
 724 CPY $PARAM3 $TEMP1                # Get thread table address result
-725 ADD $TEMP1 3                      # Move to state field
-726 SET THREAD_RUNNING $TEMP1         # Set new thread to RUNNING
+725 CPY $TEMP1 $TEMP2                # Get thread table address result
+726 ADD $TEMP2 3                      # Move to state field
+727 SET THREAD_RUNNING $TEMP2         # Set new thread to RUNNING
+728 ADD $TEMP1 4
 
 # Switch to user mode and jump to new thread
-727 CPY $STORE3 $TEMP2                # Copy new thread ID
-728 JIF $TEMP2 740                    # If thread 0 (OS), stay in kernel
-729 CALL 850                           # Switch to user mode for user threads
-730 CPY 740 $PC                       # Jump to exit
+729 CPY $STORE3 $TEMP2                # Copy new thread ID
+730 JIF $TEMP2 740                    # If thread 0 (OS), stay in kernel
+731 USER $TEMP1                       # Switch to user mode and jump
 
-740 CPY $STORE1 $FP                   # Restore frame pointer
-741 RET                               # Return
+740 RET
 
-# Save Thread State Helper (Instructions 750-799) - COMPLETELY FIXED
+
+# Save Thread State Helper (Instructions 750-799) - USING HELPER FUNCTION
 750 CPY $FP $STORE1                   # Save frame pointer
 751 CPY $SP $FP                       # Set new frame pointer
 752 CPY $PARAM1 $TEMP1                # Get thread ID
 
-# Calculate thread table base address manually (thread_ID * 10)
-753 SET @THREAD_TABLE_BASE $TEMP2     # Get thread table base (40)
-754 CPY $TEMP1 $TEMP3                 # Copy thread ID
-755 SET 0 $TEMP4                      # Initialize offset
+# Use Get Thread Table Base Helper instead of manual calculation
+753 CPY $TEMP1 $PARAM1                # Pass thread ID to helper
+754 CALL 650                          # Call Get Thread Table Base Helper
+755 CPY $PARAM3 $TEMP1                # Get thread table base address
 
-# Multiplication loop: offset = thread_ID * THREAD_ENTRY_SIZE
-756 JIF $TEMP3 770                    # If thread ID = 0, skip multiplication
-757 ADD $TEMP4 THREAD_ENTRY_SIZE      # Add 10 to offset
-758 ADD $TEMP3 -1                     # Decrement thread ID counter
-759 SET 756 $PC                       # Loop back to check
+# Save CPU registers to thread table following new layout
+# Offset 4: PC (Program Counter)
+756 CPY $TEMP1 $TEMP2                 # Get thread table base address
+757 ADD $TEMP2 4                      # Move to PC field (offset 4)
+758 CPY $PC $TEMP5                    # Get current PC
+759 SET $TEMP5 $TEMP2                 # Store PC in thread table
 
-# Calculate thread entry base address
-770 ADD $TEMP2 $TEMP4                 # base + offset = thread entry address
+# Offset 5: SP (Stack Pointer)
+760 CPY $TEMP1 $TEMP2                 # Get fresh thread table base
+761 ADD $TEMP2 5                      # Move to SP field (offset 5)
+762 CPY $SP $TEMP5                    # Get current SP
+763 SET $TEMP5 $TEMP2                 # Store SP in thread table
 
-# Save CPU registers to thread table
-771 CPY $TEMP2 $STORE2                # Save thread entry base address
-772 ADD $STORE2 4                     # Move to PC field (offset 4)
-773 CPY $PC $TEMP5                    # Get current PC
-774 SET $TEMP5 $STORE2                # Store PC in thread table
+# Offset 6: FP (Frame Pointer)
+764 CPY $TEMP1 $TEMP2                 # Get fresh thread table base
+765 ADD $TEMP2 6                      # Move to FP field (offset 6)
+766 CPY $FP $TEMP5                    # Get current FP
+767 SET $TEMP5 $TEMP2                 # Store FP in thread table
 
-775 CPY $TEMP2 $STORE2                # Restore thread entry base
-776 ADD $STORE2 5                     # Move to SP field (offset 5)
-777 CPY $SP $TEMP5                    # Get current SP
-778 SET $TEMP5 $STORE2                # Store SP in thread table
+# Offset 7: Reserved Register 1 (save $STORE1)
+768 CPY $TEMP1 $TEMP2                 # Get fresh thread table base
+769 ADD $TEMP2 7                      # Move to Res_R field (offset 7)
+770 CPY $STORE1 $TEMP5                # Get $STORE1 value
+771 SET $TEMP5 $TEMP2                 # Store Reserved Register 1
 
-779 CPY $TEMP2 $STORE2                # Restore thread entry base
-780 ADD $STORE2 6                     # Move to FP field (offset 6)
-781 CPY $FP $TEMP5                    # Get current FP
-782 SET $TEMP5 $STORE2                # Store FP in thread table
+# Offset 8: Reserved Register 2 (save $STORE2)
+772 CPY $TEMP1 $TEMP2                 # Get fresh thread table base
+773 ADD $TEMP2 8                      # Move to Res_R field (offset 8)
+774 CPY $STORE2 $TEMP5                # Get $STORE2 value
+775 SET $TEMP5 $TEMP2                 # Store Reserved Register 2
 
-# Save additional working registers if needed
-783 CPY $TEMP2 $STORE2                # Restore thread entry base
-784 ADD $STORE2 7                     # Move to saved register area (offset 7)
-785 CPY $TEMP1 $TEMP5                 # Save TEMP1 (thread ID)
-786 SET $TEMP5 $STORE2                # Store in thread table
+# Note: Offset 9 (unblocking_time) is managed by OS for SYSCALL PRN blocking
 
-787 ADD $STORE2 1                     # Move to next save slot (offset 8)
-788 CPY $TEMP2 $TEMP5                 # Save TEMP2 (base address)
-789 SET $TEMP5 $STORE2                # Store in thread table
-
-790 CPY $TEMP2 $PARAM3                # Return thread table base address
-791 CPY $STORE1 $FP                   # Restore frame pointer
-792 RET                               # Return
+776 CPY $TEMP1 $PARAM3                # Return thread table base address
+777 CPY $STORE1 $FP                   # Restore frame pointer
+778 RET                               # Return
 
 
-# Load Thread State Helper (Instructions 800-849) - COMPLETE
+
+# Load Thread State Helper (Instructions 800-849) - CORRECTED FOR NEW OFFSETS
 800 CPY $FP $STORE1                   # Save frame pointer
 801 CPY $SP $FP                       # Set new frame pointer
 802 CPY $PARAM1 $TEMP1                # Get thread ID
 
-# Calculate thread table base address manually
-803 SET @THREAD_TABLE_BASE $TEMP2     # Get thread table base (40)
-804 CPY $TEMP1 $TEMP3                 # Copy thread ID
-805 SET 0 $TEMP4                      # Initialize offset
+# Use Get Thread Table Base Helper
+803 CPY $TEMP1 $PARAM1                # Pass thread ID to helper
+804 CALL 650                          # Call Get Thread Table Base Helper
+805 CPY $PARAM3 $TEMP1                # Get thread table base address
 
-# Multiplication loop: offset = thread_ID * THREAD_ENTRY_SIZE
-806 JIF $TEMP3 820                    # If thread ID = 0, skip multiplication
-807 ADD $TEMP4 THREAD_ENTRY_SIZE      # Add 10 to offset
-808 ADD $TEMP3 -1                     # Decrement thread ID counter
-809 SET 806 $PC                       # Loop back to check
+# Restore SP FIRST (offset 5) ✅ CORRECT
+806 CPY $TEMP1 $TEMP2                 # Get thread entry base address
+807 ADD $TEMP2 5                      # Move to SP field (offset 5)
+808 CPYI $TEMP2 $TEMP5                # Get stored SP value
+809 CPY $TEMP5 $SP                    # Restore SP
 
-# Calculate thread entry base address
-820 ADDI $TEMP2 $TEMP4                 # base + offset = thread entry address
+# Restore FP (offset 6) ✅ CORRECT
+810 CPY $TEMP1 $TEMP2                 # Get fresh thread entry base
+811 ADD $TEMP2 6                      # Move to FP field (offset 6)
+812 CPYI $TEMP2 $TEMP5                # Get stored FP value
+813 CPY $TEMP5 $FP                    # Restore FP
 
+# Load Reserved Register 1 from offset 7
+814 CPY $TEMP1 $TEMP2                 # Get fresh thread entry base
+815 ADD $TEMP2 7                      # Move to Res_R field (offset 7)
+816 CPYI $TEMP2 $TEMP5                # Get stored register value
+817 CPY $TEMP5 $STORE1                # Restore to $STORE1 (or appropriate register)
 
-# Load CPU registers from thread table
-821 CPY $TEMP2 $STORE2                # Save thread entry base address
-822 ADD $STORE2 4                     # Move to PC field (offset 4)
-823 CPYI $STORE2 $TEMP5               # Get stored PC value
-824 CPY $TEMP5 $PC                    # Restore PC
+# Load Reserved Register 2 from offset 8
+818 CPY $TEMP1 $TEMP2                 # Get fresh thread entry base
+819 ADD $TEMP2 8                      # Move to Res_R field (offset 8)
+820 CPYI $TEMP2 $TEMP5                # Get stored register value
+821 CPY $TEMP5 $STORE2                # Restore to $STORE2 (or appropriate register)
 
-825 CPY $TEMP2 $STORE2                # Restore thread entry base
-826 ADD $STORE2 5                     # Move to SP field (offset 5)
-827 CPYI $STORE2 $TEMP5               # Get stored SP value
-828 CPY $TEMP5 $SP                    # Restore SP
+822 CPY $TEMP1 $PARAM3                # Return thread table base address
+823 CPY $STORE1 $FP                   # Restore frame pointer
+824 RET
 
-829 CPY $TEMP2 $STORE2                # Restore thread entry base
-830 ADD $STORE2 6                     # Move to FP field (offset 6)
-831 CPYI $STORE2 $TEMP5               # Get stored FP value
-832 CPY $TEMP5 $FP                    # Restore FP
-
-# Load additional working registers if needed
-833 CPY $TEMP2 $STORE2                # Restore thread entry base
-834 ADD $STORE2 7                     # Move to saved register area (offset 7)
-835 CPYI $STORE2 $TEMP1               # Restore TEMP1
-
-836 ADD $STORE2 1                     # Move to next save slot (offset 8)
-837 CPYI $STORE2 $TEMP2               # Restore TEMP2
-
-838 CPY $TEMP2 $PARAM3                # Return thread table base address
-839 CPY $STORE1 $FP                   # Restore frame pointer
-840 RET                               # Return
+#ID:0 starting time:1 how many execution so far in the thread:2 status:3, PC:4, SP:5, FP:6, Res_R:7, Res_R:8  unblocking_time:9
 
 
 
 
 
-# Switch to User Mode Helper (Instructions 850-899)
-850 CPY $PARAM1 $TEMP1                # Get thread ID
-851 SET 1000 $TEMP2                   # Base user address
-852 CPY $TEMP1 $TEMP3                 # Copy thread ID
-853 ADD $TEMP3 $TEMP3                 # thread_ID * 2
-854 ADD $TEMP3 $TEMP3                 # thread_ID * 4
-855 ADD $TEMP3 $TEMP3                 # thread_ID * 8
-856 ADD $TEMP2 $TEMP3                 # Approximate thread start address
-857 USER $TEMP2                       # Switch to user mode and jump
-858 RET                               # Return (should not reach here)
 
 
 
