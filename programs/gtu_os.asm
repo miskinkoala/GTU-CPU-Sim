@@ -319,7 +319,7 @@ Begin Instruction Section
 102 SET 0 @CURRENT_THREAD             # Initialize current thread to OS (0)
 103 SET 0 @SCHEDULER_COUNTER          # Initialize scheduler counter
 104 SET 0 @CONTEXT_SWITCH_FLAG        # Initialize context switch flag
-105 CALL 200                          # Call thread table initialization
+
 106 SET 4 @ACTIVE_THREAD_COUNT        # Set active thread count (threads 1-4)
 107 SET 0 @COMPLETED_THREAD_COUNT     # Initialize completed thread count
 108 SET 110 $PC                       # Jump to main OS loop
@@ -357,87 +357,6 @@ Begin Instruction Section
 191 SYSCALL PRN $TEMP1                # Print shutdown marker
 192 HLT                               # Halt the system
 
-# Thread Table Initialization (Instructions 200-299)
-200 CPY $FP $STORE1                  # Save frame pointer
-201 CPY $SP $FP                       # Set new frame pointer
-202 SET @THREAD_TABLE_BASE $TEMP1     # Load thread table base
-203 SET 0 $TEMP2                      # Initialize counter
-
-# Thread initialization loop
-204 CPY $TEMP2 $TEMP3                 # Copy counter
-205 ADD $TEMP3 -11                    # Check if counter >= 11 (MAX_THREADS)
-206 JIF $TEMP3 250                    # Exit if done
-
-207 CPY $TEMP1 $PARAM1                # Pass thread table pointer
-208 CPY $TEMP2 $PARAM2                # Pass thread ID
-209 CALL 260                          # Call thread initialization helper
-
-210 ADD $TEMP1 THREAD_ENTRY_SIZE      # Move to next thread entry
-211 ADD $TEMP2 1                      # Increment counter
-212 CPY 204 $PC                       # Loop back
-
-250 CPY $STORE1 $FP                  # Restore frame pointer
-251 RET                               # Return
-
-# Thread Initialization Helper (Instructions 260-299)
-260 CPY $PARAM1 $TEMP1                # Get thread table pointer
-261 CPY $PARAM2 $TEMP2                # Get thread ID
-
-# Store thread ID
-262 SET $TEMP2 $TEMP1                 # Store thread ID at offset 0
-263 ADD $TEMP1 1                      # Move to starting time field
-
-# Store starting time
-264 CPY $INSTR_COUNT $TEMP3           # Get current instruction count
-265 SET $TEMP3 $TEMP1                 # Store starting time at offset 1
-266 ADD $TEMP1 1                      # Move to instructions used field
-
-# Initialize instructions used
-267 SET 0 $TEMP1                      # Set instructions used to 0
-268 ADD $TEMP1 1                      # Move to state field
-
-# Set thread state based on ID
-269 CPY $TEMP2 $TEMP3                 # Copy thread ID
-270 JIF $TEMP3 280                    # If thread 0 (OS), set running
-
-# Check if valid user thread (1-4)
-271 CPY $TEMP2 $TEMP4                 # Copy thread ID
-272 ADD $TEMP4 -4                     # Check if thread ID > 4
-273 JIF $TEMP4 285                    # If > 4, set inactive
-
-# Valid user thread (1-4), set ready
-274 SET THREAD_READY $TEMP1           # Set state to ready
-275 CALL 290                          # Set PC and SP for user thread
-276 CPY 299 $PC                       # Jump to return
-
-# OS thread (0), set running
-280 SET THREAD_RUNNING $TEMP1         # Set state to running
-281 ADD $TEMP1 1                      # Move to PC field
-282 SET 100 $TEMP1                    # Set PC to OS start
-283 ADD $TEMP1 1                      # Move to SP field
-284 SET 1000 $TEMP1                   # Set SP for OS
-285 CPY 299 $PC                       # Jump to return
-
-# Inactive thread (>4), set inactive
-286 SET THREAD_INACTIVE $TEMP1        # Set state to inactive
-287 ADD $TEMP1 1                      # Move to PC field
-288 SET 0 $TEMP1                      # Set PC to 0
-289 CPY 299 $PC                       # Jump to return
-
-# Set PC and SP for user threads
-290 ADD $TEMP1 1                      # Move to PC field
-291 CPY $TEMP2 $TEMP3                 # Copy thread ID
-292 SET 1000 $TEMP4                   # Base address
-293 CPY $TEMP3 $TEMP5                 # Copy thread ID
-294 ADD $TEMP5 $TEMP5                 # thread_ID * 2
-295 ADD $TEMP5 $TEMP5                 # thread_ID * 4  
-296 ADD $TEMP5 $TEMP5                 # thread_ID * 8
-297 ADD $TEMP4 $TEMP5                 # Approximate thread_ID * 1000
-298 SET $TEMP4 $TEMP1                 # Store PC
-299 ADD $TEMP1 1                      # Move to SP field
-300 ADD $TEMP4 999                    # Calculate end of thread area
-301 SET $TEMP4 $TEMP1                 # Store SP
-302 RET                               # Return
 
 
 
