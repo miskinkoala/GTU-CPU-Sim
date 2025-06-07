@@ -77,7 +77,7 @@ Begin Data Section
 50 1                                  # Thread ID: 1
 51 0                                  # Starting time: 0 (will be set by OS)
 52 0                                  # Instructions used: 0
-53 1                       # State: READY (1)
+53 3                       # State: READY (1)
 54 1000                     # PC: 1000 (thread start address)
 55 1999                       # SP: 1999 (thread stack top)
 56 1999                       # FP: 1999 (thread frame pointer)
@@ -207,7 +207,7 @@ Begin Data Section
 172 0
 173 0
 174 4
-175 0
+175 1
 
 999 48879
 
@@ -262,7 +262,7 @@ Begin Instruction Section
 104 SET 0 26        # Initialize context switch flag
 
 106 SET 4 174        # Set active thread count (threads 1-4)
-107 SET 0 175     # Initialize completed thread count
+107 SET 1 175     # Initialize completed thread count
 108 SET 110 0                       # Jump to main OS loop
 
 #OS state == 2 (shutdown) inti:0,running:1,shutdown:2
@@ -313,7 +313,7 @@ Begin Instruction Section
 354 CPY 17 6                 # Copy counter
 355 ADD 6 -3                     # ✅ FIXED: temp3 = counter - 3
 356 JIF 6 358                    # Continue if counter <= 3
-357 SET 390 0                       # Exit if counter > 3
+357 SET 392 0                       # Exit if counter > 3
  
 # Check if thread is blocked
 358 CPY 16 10                # Pass thread ID
@@ -335,27 +335,30 @@ Begin Instruction Section
 372 CPY 3 16          # Get thread table base again
 373 CPY 9 17                # Move to unblock time field
 374 SUBI 17 16              # store2 = current_time - unblock_time
-375 JIF 16 385                   # If unblock_time >= current_time, block remain
+375 JIF 16 387                   # If unblock_time >= current_time, block remain
 376 SET 382 0                       # unblock, try next
 
 # Unblock the thread
 382 CPY 12 16               # Get thread table base
 383 ADD 16 3                     # Move to state field
-384 SET 1 16          # Set thread back to READY
+
+384 SET 751 8                      # Move to state field
+385 SET 1 751
+386 CPYI2 8 16
 #TODO may reset unblock time
 
 # Try next thread
-385 ADD 16 1                      # Increment thread ID
-386 CPY 16 7                 # Copy thread ID
-387 ADD 7 -3                     # ✅ FIXED: temp4 = thread_ID - 3
-388 JIF 7 392                    # Continue if thread_ID <= 3
-389 SET 1 16                      # Wrap to thread 1
+387 ADD 16 1                      # Increment thread ID
+388 CPY 16 7                 # Copy thread ID
+389 ADD 7 -3                     # ✅ FIXED: temp4 = thread_ID - 3
+390 JIF 7 392                    # Continue if thread_ID <= 3
+391 SET 1 16                      # Wrap to thread 1
 
-390 CPY 15 14                   # Restore frame pointer
-391 RET                             # Return
+392 CPY 15 14                   # Restore frame pointer
+393 RET                             # Return
                              
-392 ADD 17 1                      # Increment counter
-393 SET 354 0                       # Continue loop
+394 ADD 17 1                      # Increment counter
+395 SET 354 0                       # Continue loop
 
 
 
@@ -406,8 +409,8 @@ Begin Instruction Section
 440 ADD 16 1                     # ✅ Increment thread ID (preserved)
 441 CPY 16 4                # Copy thread ID
 442 ADD 4 -3                     # Check if > 3
-443 JIF 4 445                    # If > 3, wrap to 1
-444 SET 450 0                       # Continue with current thread ID
+443 JIF 4 450                    # If > 3, wrap to 1
+444 SET 445 0                       # Continue with current thread ID
 
 445 SET 1 16                     # Wrap to thread 1
 
@@ -449,9 +452,11 @@ Begin Instruction Section
 522 ADD 5 9                      # Move to reserved area (offset 9) for unblock time
 523 CPY 3 6           # Get current instruction count
 524 ADD 6 100                    # Add 100 instructions
-525 CPY 6 750
 
-526 CPY 750 5                # ✅ CORRECT: Store 6 value at address 5
+525 CPY 6 750
+525 SET 6 750
+
+526 CPYI2 750 5                # ✅ CORRECT: Store 6 value at address 5
 
 527 SET 1 26        # Force context switch
 528 SET 550 0                       # Return
@@ -467,7 +472,7 @@ Begin Instruction Section
 537 SET 550 0                       # Return
 
 550 SET 0 2                # Clear system call result
-551 SET 111 0
+551 SET 125 0
 
 # Get Thread State Helper (Instructions 600-699) - ADJUSTED FOR YOUR REGISTER LAYOUT
 600 CPY 10 4                # Get thread ID
@@ -521,7 +526,11 @@ Begin Instruction Section
 705 CALL 750                          # Save current thread state
 706 CPY 12 4                # Get thread table address result
 707 ADD 4 3                      # Move to state field
-708 SET 1 4           # Set current thread to READY
+
+708 SET 751 8                      # Move to state field
+709 SET 1 751
+719 CPYI2 8 4
+
 
 # Load new thread context
 720 CPY 165 17          # Get next thread ID
@@ -627,15 +636,20 @@ Begin Instruction Section
 
 822 CPY 4 5                 # Get fresh thread entry base
 823 ADD 5 3                      # Move to state field
-824 SET 2 5         # Set new thread to RUNNING
-825 CPY 4 5                 # Get fresh thread entry base
-826 ADD 5 4
+
+
+824 SET 751 8                      # Move to state field
+825 SET 2 751
+826 CPYI2 8 5
+
+827 CPY 4 5                 # Get fresh thread entry base
+828 ADD 5 4
 
 # Switch to user mode and jump to new thread
-827 CPYI 4 4
-828 JIF 4 115                    # If thread 0 (OS), stay in kernel
-829 CPYI 5 5
-830 USER 5                       # Switch to user mode and jump
+829 CPYI 4 4
+830 JIF 4 115                    # If thread 0 (OS), stay in kernel
+831 CPYI 5 5
+832 USER 5                       # Switch to user mode and jump
 
 #ID:0 starting time:1 how many execution so far in the thread:2 status:3, PC:4, SP:5, FP:6, Res_R:7, Res_R:8  unblocking_time:9
 
@@ -657,14 +671,22 @@ Begin Instruction Section
 
 # Mark thread as completed
 905 ADD 4 3                      # Move to state field (offset 3)
-906 SET 0 4        # Set thread to INACTIVE at correct address
+
+906 SET 
+ 8                      # Move to state field
+907 SET 0 751
+908 CPYI2 8 4
+
+
+
+
 
 # Update completion statistics
-907 ADD 175 1     # Increment completed count
-908 SET 0 23             # Reset current thread to OS
+909 ADD 175 1     # Increment completed count
+910 SET 0 23             # Reset current thread to OS
 
-909 CPY 15 14                   # Restore frame pointer
-910 RET                               # Return
+911 CPY 15 14                   # Restore frame pointer
+912 RET                               # Return
 
 
 
@@ -743,7 +765,7 @@ Begin Instruction Section
 
 
 
-# Thread 2: Bubble Sort - Sorts N Numbers in Increasing Order
+# Thread 2: Bubble Sort - Sorts N Numbers in Increasing Order (NOT READY)
 2000 CPY 2001 4        # Load array size N (5)
 2001 SET 2003 5                  # Array start address (2003)
 2002 SET 0 6                     # Outer loop counter
@@ -836,7 +858,7 @@ Begin Instruction Section
 3015 JIF 12 3040                 # If not equal (result != 0), continue
 
 # Found element - store index and exit
-3016 SET 7 3008                  # Store found index in result location
+3016 CPY 7 3008                  # Store found index in result location
 3017 SET 3050 0                     # Exit search immediately
 
 # Continue to next element

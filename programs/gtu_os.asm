@@ -141,7 +141,7 @@ $STORE4 0
 50 1                                  # Thread ID: 1
 51 0                                  # Starting time: 0 (will be set by OS)
 52 0                                  # Instructions used: 0
-53 THREAD_READY                       # State: READY (1)
+53 THREAD_BLOCKED                       # State: READY (1)
 54 @THREAD1_START                     # PC: 1000 (thread start address)
 55 @THREAD1_END                       # SP: 1999 (thread stack top)
 56 @THREAD1_END                       # FP: 1999 (thread frame pointer)
@@ -271,7 +271,7 @@ $STORE4 0
 172 0
 173 0
 @ACTIVE_THREAD_COUNT 4
-@COMPLETED_THREAD_COUNT 0
+@COMPLETED_THREAD_COUNT 1
 
 @KERNEL_END SENTINEL_BEEF
 
@@ -326,7 +326,7 @@ Begin Instruction Section
 104 SET 0 @CONTEXT_SWITCH_FLAG        # Initialize context switch flag
 
 106 SET 4 @ACTIVE_THREAD_COUNT        # Set active thread count (threads 1-4)
-107 SET 0 @COMPLETED_THREAD_COUNT     # Initialize completed thread count
+107 SET 1 @COMPLETED_THREAD_COUNT     # Initialize completed thread count
 108 SET 110 $PC                       # Jump to main OS loop
 
 #OS state == 2 (shutdown) inti:0,running:1,shutdown:2
@@ -377,7 +377,7 @@ Begin Instruction Section
 354 CPY $STORE3 $TEMP3                 # Copy counter
 355 ADD $TEMP3 -3                     # ✅ FIXED: temp3 = counter - 3
 356 JIF $TEMP3 358                    # Continue if counter <= 3
-357 SET 390 $PC                       # Exit if counter > 3
+357 SET 392 $PC                       # Exit if counter > 3
  
 # Check if thread is blocked
 358 CPY $STORE2 $PARAM1                # Pass thread ID
@@ -399,27 +399,30 @@ Begin Instruction Section
 372 CPY $INSTR_COUNT $STORE2          # Get thread table base again
 373 CPY $TEMP6 $STORE3                # Move to unblock time field
 374 SUBI $STORE3 $STORE2              # store2 = current_time - unblock_time
-375 JIF $STORE2 385                   # If unblock_time >= current_time, block remain
+375 JIF $STORE2 387                   # If unblock_time >= current_time, block remain
 376 SET 382 $PC                       # unblock, try next
 
 # Unblock the thread
 382 CPY $PARAM3 $STORE2               # Get thread table base
 383 ADD $STORE2 3                     # Move to state field
-384 SET THREAD_READY $STORE2          # Set thread back to READY
+
+384 SET 751 $TEMP5                      # Move to state field
+385 SET THREAD_READY 751
+386 CPYI2 $TEMP5 $STORE2
 #TODO may reset unblock time
 
 # Try next thread
-385 ADD $STORE2 1                      # Increment thread ID
-386 CPY $STORE2 $TEMP4                 # Copy thread ID
-387 ADD $TEMP4 -3                     # ✅ FIXED: temp4 = thread_ID - 3
-388 JIF $TEMP4 392                    # Continue if thread_ID <= 3
-389 SET 1 $STORE2                      # Wrap to thread 1
+387 ADD $STORE2 1                      # Increment thread ID
+388 CPY $STORE2 $TEMP4                 # Copy thread ID
+389 ADD $TEMP4 -3                     # ✅ FIXED: temp4 = thread_ID - 3
+390 JIF $TEMP4 392                    # Continue if thread_ID <= 3
+391 SET 1 $STORE2                      # Wrap to thread 1
 
-390 CPY $STORE1 $FP                   # Restore frame pointer
-391 RET                             # Return
+392 CPY $STORE1 $FP                   # Restore frame pointer
+393 RET                             # Return
                              
-392 ADD $STORE3 1                      # Increment counter
-393 SET 354 $PC                       # Continue loop
+394 ADD $STORE3 1                      # Increment counter
+395 SET 354 $PC                       # Continue loop
 
 
 
@@ -470,8 +473,8 @@ Begin Instruction Section
 440 ADD $STORE2 1                     # ✅ Increment thread ID (preserved)
 441 CPY $STORE2 $TEMP1                # Copy thread ID
 442 ADD $TEMP1 -3                     # Check if > 3
-443 JIF $TEMP1 445                    # If > 3, wrap to 1
-444 SET 450 $PC                       # Continue with current thread ID
+443 JIF $TEMP1 450                    # If > 3, wrap to 1
+444 SET 445 $PC                       # Continue with current thread ID
 
 445 SET 1 $STORE2                     # Wrap to thread 1
 
@@ -513,9 +516,11 @@ Begin Instruction Section
 522 ADD $TEMP2 9                      # Move to reserved area (offset 9) for unblock time
 523 CPY $INSTR_COUNT $TEMP3           # Get current instruction count
 524 ADD $TEMP3 100                    # Add 100 instructions
-525 CPY $TEMP3 750
 
-526 CPY 750 $TEMP2                # ✅ CORRECT: Store $TEMP3 value at address $TEMP2
+525 CPY $TEMP3 750
+525 SET $TEMP3 750
+
+526 CPYI2 750 $TEMP2                # ✅ CORRECT: Store $TEMP3 value at address $TEMP2
 
 527 SET 1 @CONTEXT_SWITCH_FLAG        # Force context switch
 528 SET 550 $PC                       # Return
@@ -531,7 +536,7 @@ Begin Instruction Section
 537 SET 550 $PC                       # Return
 
 550 SET 0 $SYSCALL_RES                # Clear system call result
-551 SET 111 0
+551 SET 125 0
 
 # Get Thread State Helper (Instructions 600-699) - ADJUSTED FOR YOUR REGISTER LAYOUT
 600 CPY $PARAM1 $TEMP1                # Get thread ID
@@ -585,7 +590,11 @@ Begin Instruction Section
 705 CALL 750                          # Save current thread state
 706 CPY $PARAM3 $TEMP1                # Get thread table address result
 707 ADD $TEMP1 3                      # Move to state field
-708 SET THREAD_READY $TEMP1           # Set current thread to READY
+
+708 SET 751 $TEMP5                      # Move to state field
+709 SET THREAD_READY 751
+719 CPYI2 $TEMP5 $TEMP1
+
 
 # Load new thread context
 720 CPY @NEXT_THREAD $STORE3          # Get next thread ID
@@ -691,15 +700,20 @@ Begin Instruction Section
 
 822 CPY $TEMP1 $TEMP2                 # Get fresh thread entry base
 823 ADD $TEMP2 3                      # Move to state field
-824 SET THREAD_RUNNING $TEMP2         # Set new thread to RUNNING
-825 CPY $TEMP1 $TEMP2                 # Get fresh thread entry base
-826 ADD $TEMP2 4
+
+
+824 SET 751 $TEMP5                      # Move to state field
+825 SET THREAD_RUNNING 751
+826 CPYI2 $TEMP5 $TEMP2
+
+827 CPY $TEMP1 $TEMP2                 # Get fresh thread entry base
+828 ADD $TEMP2 4
 
 # Switch to user mode and jump to new thread
-827 CPYI $TEMP1 $TEMP1
-828 JIF $TEMP1 115                    # If thread 0 (OS), stay in kernel
-829 CPYI $TEMP2 $TEMP2
-830 USER $TEMP2                       # Switch to user mode and jump
+829 CPYI $TEMP1 $TEMP1
+830 JIF $TEMP1 115                    # If thread 0 (OS), stay in kernel
+831 CPYI $TEMP2 $TEMP2
+832 USER $TEMP2                       # Switch to user mode and jump
 
 #ID:0 starting time:1 how many execution so far in the thread:2 status:3, PC:4, SP:5, FP:6, Res_R:7, Res_R:8  unblocking_time:9
 
@@ -721,14 +735,22 @@ Begin Instruction Section
 
 # Mark thread as completed
 905 ADD $TEMP1 3                      # Move to state field (offset 3)
-906 SET THREAD_INACTIVE $TEMP1        # Set thread to INACTIVE at correct address
+
+906 SET 
+ $TEMP5                      # Move to state field
+907 SET THREAD_INACTIVE 751
+908 CPYI2 $TEMP5 $TEMP1
+
+
+
+
 
 # Update completion statistics
-907 ADD @COMPLETED_THREAD_COUNT 1     # Increment completed count
-908 SET 0 @CURRENT_THREAD             # Reset current thread to OS
+909 ADD @COMPLETED_THREAD_COUNT 1     # Increment completed count
+910 SET 0 @CURRENT_THREAD             # Reset current thread to OS
 
-909 CPY $STORE1 $FP                   # Restore frame pointer
-910 RET                               # Return
+911 CPY $STORE1 $FP                   # Restore frame pointer
+912 RET                               # Return
 
 
 
@@ -807,7 +829,7 @@ Begin Instruction Section
 
 
 
-# Thread 2: Bubble Sort - Sorts N Numbers in Increasing Order
+# Thread 2: Bubble Sort - Sorts N Numbers in Increasing Order (NOT READY)
 @THREAD2_START CPY 2001 $TEMP1        # Load array size N (5)
 2001 SET 2003 $TEMP2                  # Array start address (2003)
 2002 SET 0 $TEMP3                     # Outer loop counter
@@ -900,7 +922,7 @@ Begin Instruction Section
 3015 JIF $PARAM3 3040                 # If not equal (result != 0), continue
 
 # Found element - store index and exit
-3016 SET $TEMP4 3008                  # Store found index in result location
+3016 CPY $TEMP4 3008                  # Store found index in result location
 3017 SET 3050 $PC                     # Exit search immediately
 
 # Continue to next element
