@@ -59,65 +59,68 @@ Begin Data Section
 # Thread Table Structure (4 threads * 10 words each)
 # Thread 0 (OS itself)
 #######THREAD TABLE#######
+# Thread Control Block Layout: ID, Start_Time, Instructions_Used, State, PC, SP, FP, Reserved1, Reserved2, Unblock_Time
 
-40 0
-41 0
-42 0
-43 2
-44 21
-45 999
-46 999
-47 0
-48 0
-49 0
+# Thread 0 (OS itself)
+40 0                  # Thread ID: 0 (OS)
+41 0                                  # Starting time: 0
+42 0                                  # Instructions used: 0
+43 2                     # State: RUNNING (2)
+44 100                                # PC: OS starts at instruction 100
+45 999                                # SP: OS stack pointer (kernel end)
+46 999                                # FP: OS frame pointer (kernel end)
+47 0                                  # Reserved register 1 (15)
+48 0                                  # Reserved register 2 (16)
+49 0                                  # Unblock time: 0 (not applicable for OS)
 
-# Thread 1 (Sorting Thread) - FIXED STACK SIZE
-50 1
-51 0
-52 0
-53 1
-54 1000
-55 1999
-56 1999
-57 0
-58 0
-59 0
+# Thread 1 (Simple Counter Thread)
+50 1                                  # Thread ID: 1
+51 0                                  # Starting time: 0 (will be set by OS)
+52 0                                  # Instructions used: 0
+53 1                       # State: READY (1)
+54 1000                     # PC: 1000 (thread start address)
+55 1999                       # SP: 1999 (thread stack top)
+56 1999                       # FP: 1999 (thread frame pointer)
+57 0                                  # Reserved register 1 (15)
+58 0                                  # Reserved register 2 (16)
+59 0                                  # Unblock time: 0 (not blocked)
 
-# Thread 2 (Search Thread) - FIXED STACK SIZE
-60 2
-61 0
-62 0
-63 1
-64 2000
-65 2999
-66 2999
-67 0
-68 0
-69 0
+# Thread 2 (Bubble Sort Thread)
+60 2                                  # Thread ID: 2
+61 0                                  # Starting time: 0 (will be set by OS)
+62 0                                  # Instructions used: 0
+63 0                       # State: READY (1)
+64 2000                     # PC: 2000 (thread start address)
+65 2999                       # SP: 2999 (thread stack top)
+66 2999                       # FP: 2999 (thread frame pointer)
+67 0                                  # Reserved register 1 (15)
+68 0                                  # Reserved register 2 (16)
+69 0                                  # Unblock time: 0 (not blocked)
 
-# Thread 3 (Custom Thread) - FIXED STACK SIZE
-70 3
-71 0
-72 0
-73 1
-74 3000
-75 3999
-76 3999
-77 0
-78 0
-79 0
+# Thread 3 (Linear Search Thread)
+70 3                                  # Thread ID: 3
+71 0                                  # Starting time: 0 (will be set by OS)
+72 0                                  # Instructions used: 0
+73 1                       # State: READY (1)
+74 3000                     # PC: 3000 (thread start address)
+75 3999                       # SP: 3999 (thread stack top)
+76 3999                       # FP: 3999 (thread frame pointer)
+77 0                                  # Reserved register 1 (15)
+78 0                                  # Reserved register 2 (16)
+79 0                                  # Unblock time: 0 (not blocked)
 
-# Thread 4 (placeholder Thread) - FIXED STACK SIZE
-80 4
-81 0
-82 0
-83 0
-84 4000
-85 4999
-86 4999
-87 0
-88 0
-89 0
+# Thread 4 (Inactive placeholder)
+80 4                                  # Thread ID: 4
+81 0                                  # Starting time: 0
+82 0                                  # Instructions used: 0
+83 0                    # State: INACTIVE (0)
+84 4000                     # PC: 4000 (placeholder)
+85 4999                       # SP: 4999 (placeholder)
+86 4999                       # FP: 4999 (placeholder)
+87 0                                  # Reserved register 1 (15)
+88 0                                  # Reserved register 2 (16)
+89 0                                  # Unblock time: 0 (not applicable)
+
 
 # Thread 5 (placeholder Thread) - FIXED STACK SIZE
 90 5
@@ -215,26 +218,34 @@ Begin Data Section
 1003 0                               # Sum accumulator (initially 0)
 
 
-# Thread 2 Data Area (2000-2999) - Linear Search
-2000 0
-2001 5
-2002 25
-2003 64
-2004 34
-2005 25
-2006 12
-2007 90
-2008 -1
-2009 0
-2010 0
+# Thread 2 Data Area (2000-2999) - Bubble Sort
+2000 0                     # Thread start marker
+2001 5                               # N = Array size (5 numbers)
+2002 0                               # Unused
+2003 64                              # Array element 0
+2004 34                              # Array element 1  
+2005 25                              # Array element 2
+2006 12                              # Array element 3
+2007 90                              # Array element 4
+2008 0                               # Workspace
+2009 0                               # Workspace
+2010 0                               # Workspace
 
-# Thread 3 Data Area (3000-3999) - Factorial Calculator
-3000 0
-3001 5
-3002 1
-3003 1
-3004 0
-3005 0
+
+
+# Thread 3 Data Area (3000-3999) - Linear Search
+3000 0                     # Thread start marker
+3001 5                               # N = Array size (5 numbers)
+3002 25                              # Search key (looking for 25)
+3003 64                              # Array element 0
+3004 34                              # Array element 1  
+3005 25                              # Array element 2 ← Target found here
+3006 12                              # Array element 3
+3007 90                              # Array element 4
+3008 -1                              # Result storage (initially -1 = not found)
+3009 0                               # Workspace
+3010 0                               # Workspace
+
 
 End Data Section
 
@@ -456,8 +467,7 @@ Begin Instruction Section
 537 SET 550 0                       # Return
 
 550 SET 0 2                # Clear system call result
-551 RET                               # Return
-
+551 SET 111 0
 
 # Get Thread State Helper (Instructions 600-699) - ADJUSTED FOR YOUR REGISTER LAYOUT
 600 CPY 10 4                # Get thread ID
@@ -693,70 +703,150 @@ Begin Instruction Section
 
 
 
-# Thread 2: Linear Search - FIXED FOR ARCHITECTURE
+# Thread 2: Linear Search - CORRECTED VERSION
 2000 CPY 2001 4        # Load array size (5)
 2001 CPY 2002 5                  # Load search key (25)
 2002 SET 2003 6                  # Array start address (2003)
-2003 SET 0 7                     # Search counter
+2003 SET 0 7                     # Search counter/index
 2004 SET -1 2008                      # Initialize result to -1 (not found)
 
 # Search loop
 2005 CPY 7 8                # Copy counter
-2006 SUBI 4 8               # temp5 = array_size - counter (keep SUBI as is)
-2007 JIF 8 2050                  # Exit if counter >= array_size
+2006 CPY 4 9                # Copy array size
+2007 SUBI 8 9               # temp6 = array_size - counter
+2008 JIF 9 2050                  # Exit if counter >= array_size
 
-2008 CPY 6 9                # Copy array base
-2009 ADD 9 7                # Add counter offset
-2010 CPYI 9 10              # ✅ FIXED: Get current element using indirect copy
+# Get current element from array
+2009 CPY 6 9                # Copy array base address
+2010 ADD 9 7                # Add counter offset to get element address
+2011 CPYI 9 10              # Get current element using indirect copy
 
-# Compare with key
-2011 CPY 10 11              # Copy element
-2012 SUBI 5 11              # param2 = key - element (keep SUBI as is)
-2013 JIF 11 2040                 # If not equal, continue
+# Compare with search key
+2012 CPY 10 11              # Copy current element
+2013 CPY 5 12               # Copy search key
+2014 SUBI 11 12             # param3 = key - element
+2015 JIF 12 2040                 # If not equal (result != 0), continue
 
-# Found element
-2014 SET 7 2008                  # Store found index
-2015 SET 2050 0                     # Exit search
+# Found element - store index and exit
+2016 SET 7 2008                  # Store found index in result location
+2017 SET 2050 0                     # Exit search immediately
 
-2040 ADD 7 1                     # Increment counter
-2041 SYSCALL YIELD                    # ✅ Yield CPU for cooperative scheduling
-2042 SET 2005 0                     # Continue search
+# Continue to next element
+2040 ADD 7 1                     # Increment counter/index
+2041 SYSCALL YIELD                    # Yield CPU for cooperative scheduling
+2042 SET 2005 0                     # Continue search loop
 
-2050 CPYI 2008 10                # ✅ FIXED: Get result using indirect copy
-2051 SYSCALL PRN 10              # ✅ FIXED: Print result value
+# Print result
+2050 CPYI 2008 10                # Get search result using indirect copy
+2051 SYSCALL PRN 10              # Print result (index if found, -1 if not found)
 2052 SYSCALL HLT                      # Thread complete
 
 
 
-# Thread 3: Factorial Calculator - FIXED FOR ARCHITECTURE
-3000 CPY 3001 4        # Load factorial input (5)
-3001 SET 1 3002                       # Initialize result to 1
-3002 SET 1 5                     # Initialize counter to 1
+# Thread 2: Bubble Sort - Sorts N Numbers in Increasing Order
+2000 CPY 2001 4        # Load array size N (5)
+2001 SET 2003 5                  # Array start address (2003)
+2002 SET 0 6                     # Outer loop counter
 
-# Factorial loop
-3003 CPY 5 6                # Copy counter
-3004 SUBI 4 6               # temp3 = input - counter (keep SUBI as is)
-3005 JIF 6 3050                  # Exit if counter > input
+# Outer loop
+2003 CPY 6 7                # Copy outer counter
+2004 CPY 4 8                # Copy array size N
+2005 ADD 8 -1                    # size - 1
+2006 SUBI 7 8               # temp5 = (size-1) - outer
+2007 JIF 8 2080                  # Exit if outer >= size-1
 
-# Multiply result by counter
-3006 CPYI 3002 7                 # ✅ FIXED: Load current result using indirect copy
-3007 SET 0 8                     # Initialize multiplication result
-3008 CPY 5 9                # Copy counter for multiplication
+2008 SET 0 9                     # Inner loop counter
 
-# Multiplication by addition loop
-3009 JIF 9 3030                  # Exit if multiplier = 0
-3010 ADD 8 7                # Add result to accumulator
-3011 ADD 9 -1                    # Decrement multiplier
-3012 SYSCALL YIELD                    # ✅ Yield CPU during multiplication
-3013 SET 3009 0                     # Continue multiplication
+# Inner loop with bubble sort comparison
+2009 CPY 9 15               # Copy inner counter
+2010 CPY 4 16               # Copy array size
+2011 ADD 16 -1                   # size - 1
+2012 CPY 6 17               # Copy outer counter
+2013 SUBI 16 17             # store2 = (size-1) - outer
+2014 SUBI 16 15             # store2 = (size-1-outer) - inner
+2015 JIF 16 2070                 # Exit inner if inner >= (size-1-outer)
 
-3030 SET 8 3002                  # Store multiplication result
-3031 ADD 5 1                     # Increment counter
-3032 SYSCALL YIELD                    # ✅ Yield CPU between factorial iterations
-3033 SET 3003 0                     # Continue factorial loop
+# Compare adjacent elements
+2016 CPY 5 17               # Copy array base address
+2017 ADD 17 9               # Add inner counter to get current element address
+2018 CPYI 17 10             # Get arr[inner] using indirect copy
+2019 ADD 17 1                    # Move to next element address
+2020 CPYI 17 11             # Get arr[inner+1] using indirect copy
 
-3050 CPYI 3002 10                # ✅ FIXED: Get factorial result using indirect copy
-3051 SYSCALL PRN 10              # ✅ FIXED: Print factorial result value
+# Check if swap needed (if arr[inner] > arr[inner+1])
+2021 CPY 10 12              # Copy first element
+2022 SUBI 11 12             # param3 = arr[inner] - arr[inner+1]
+2023 JIF 12 2060                 # If arr[inner] <= arr[inner+1], no swap needed
+
+# Swap elements (arr[inner] > arr[inner+1])
+2024 CPY 5 17               # Get array base address
+2025 ADD 17 9               # Add inner counter
+2026 SET 11 17              # Store arr[inner+1] in arr[inner] position
+2027 ADD 17 1                    # Move to next position
+2028 SET 10 17              # Store arr[inner] in arr[inner+1] position
+
+2060 ADD 9 1                     # Increment inner counter
+2061 SYSCALL YIELD                    # Yield CPU for cooperative scheduling
+2062 SET 2009 0                     # Continue inner loop
+
+2070 ADD 6 1                     # Increment outer counter
+2071 SYSCALL YIELD                    # Yield CPU between outer loop iterations
+2072 SET 2003 0                     # Continue outer loop
+
+# Print sorted array in increasing order
+2080 SET 0 6                     # Print counter
+2081 CPY 6 7                # Copy counter
+2082 CPY 4 8                # Copy array size
+2083 SUBI 7 8               # temp5 = array_size - counter
+2084 JIF 8 2090                  # Exit if printed all elements
+2085 CPY 5 9                # Array base address
+2086 ADD 9 6                # Add counter to get element address
+2087 CPYI 9 10              # Get element using indirect copy
+2088 SYSCALL PRN 10              # Print sorted element value
+2089 ADD 6 1                     # Increment print counter
+2090 SET 2081 0                     # Continue printing
+
+2091 SYSCALL HLT                      # Thread complete
+
+
+
+
+# Thread 3: Linear Search - CORRECTED VERSION
+3000 CPY 3001 4        # Load array size (5)
+3001 CPY 3002 5                  # Load search key (25)
+3002 SET 3003 6                  # Array start address (3003)
+3003 SET 0 7                     # Search counter/index
+3004 SET -1 3008                      # Initialize result to -1 (not found)
+
+# Search loop
+3005 CPY 7 8                # Copy counter
+3006 CPY 4 9                # Copy array size
+3007 SUBI 8 9               # temp6 = array_size - counter
+3008 JIF 9 3050                  # Exit if counter >= array_size
+
+# Get current element from array
+3009 CPY 6 9                # Copy array base address
+3010 ADD 9 7                # Add counter offset to get element address
+3011 CPYI 9 10              # Get current element using indirect copy
+
+# Compare with search key
+3012 CPY 10 11              # Copy current element
+3013 CPY 5 12               # Copy search key
+3014 SUBI 11 12             # param3 = key - element
+3015 JIF 12 3040                 # If not equal (result != 0), continue
+
+# Found element - store index and exit
+3016 SET 7 3008                  # Store found index in result location
+3017 SET 3050 0                     # Exit search immediately
+
+# Continue to next element
+3040 ADD 7 1                     # Increment counter/index
+3041 SYSCALL YIELD                    # Yield CPU for cooperative scheduling
+3042 SET 3005 0                     # Continue search loop
+
+# Print result
+3050 CPYI 3008 10                # Get search result using indirect copy
+3051 SYSCALL PRN 10              # Print result (index if found, -1 if not found)
 3052 SYSCALL HLT                      # Thread complete
 
 
