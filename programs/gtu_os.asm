@@ -149,7 +149,7 @@ $STORE4 0
 58 0                                  # Reserved register 2 ($STORE2)
 59 0                                  # Unblock time: 0 (not blocked)
 
-# Thread 2 (Bubble Sort Thread)
+# Thread 2 (Bubble Sort Thread) (NOT READY)
 60 2                                  # Thread ID: 2
 61 0                                  # Starting time: 0 (will be set by OS)
 62 0                                  # Instructions used: 0
@@ -165,7 +165,7 @@ $STORE4 0
 70 3                                  # Thread ID: 3
 71 0                                  # Starting time: 0 (will be set by OS)
 72 0                                  # Instructions used: 0
-73 THREAD_READY                       # State: READY (1)
+73 THREAD_INACTIVE                       # State: READY (1)
 74 @THREAD3_START                     # PC: 3000 (thread start address)
 75 @THREAD3_END                       # SP: 3999 (thread stack top)
 76 @THREAD3_END                       # FP: 3999 (thread frame pointer)
@@ -326,7 +326,7 @@ Begin Instruction Section
 104 SET 0 @CONTEXT_SWITCH_FLAG        # Initialize context switch flag
 
 106 SET 4 @ACTIVE_THREAD_COUNT        # Set active thread count (threads 1-4)
-107 SET 1 @COMPLETED_THREAD_COUNT     # Initialize completed thread count
+107 SET 2 @COMPLETED_THREAD_COUNT     # Initialize completed thread count ONE USER THREAD NOT READY SO THAT I start from 1
 108 SET 110 $PC                       # Jump to main OS loop
 
 #OS state == 2 (shutdown) inti:0,running:1,shutdown:2
@@ -767,7 +767,7 @@ Begin Instruction Section
 
 # Print current number
 1007 SYSCALL PRN $TEMP2               # Print current counter value
-1008 SYSCALL YIELD                    # Yield CPU for cooperative scheduling
+#1008 SYSCALL YIELD                    # Yield CPU for cooperative scheduling
 
 # Add to sum
 1009 CPYI 1003 $TEMP6                 # Load current sum
@@ -776,7 +776,7 @@ Begin Instruction Section
 
 # Increment counter and continue
 1012 ADD $TEMP2 1                     # Increment counter
-1013 SYSCALL YIELD                    # Yield CPU between iterations
+#1013 SYSCALL YIELD                    # Yield CPU between iterations
 1014 SET 1003 $PC                     # Continue main loop
 
 # Print final sum
@@ -786,46 +786,6 @@ Begin Instruction Section
 
 
 
-
-
-
-# Thread 2: Linear Search - CORRECTED VERSION
-@THREAD2_START CPY 2001 $TEMP1        # Load array size (5)
-2001 CPY 2002 $TEMP2                  # Load search key (25)
-2002 SET 2003 $TEMP3                  # Array start address (2003)
-2003 SET 0 $TEMP4                     # Search counter/index
-2004 SET -1 2008                      # Initialize result to -1 (not found)
-
-# Search loop
-2005 CPY $TEMP4 $TEMP5                # Copy counter
-2006 CPY $TEMP1 $TEMP6                # Copy array size
-2007 SUBI $TEMP5 $TEMP6               # temp6 = array_size - counter
-2008 JIF $TEMP6 2050                  # Exit if counter >= array_size
-
-# Get current element from array
-2009 CPY $TEMP3 $TEMP6                # Copy array base address
-2010 ADD $TEMP6 $TEMP4                # Add counter offset to get element address
-2011 CPYI $TEMP6 $PARAM1              # Get current element using indirect copy
-
-# Compare with search key
-2012 CPY $PARAM1 $PARAM2              # Copy current element
-2013 CPY $TEMP2 $PARAM3               # Copy search key
-2014 SUBI $PARAM2 $PARAM3             # param3 = key - element
-2015 JIF $PARAM3 2040                 # If not equal (result != 0), continue
-
-# Found element - store index and exit
-2016 SET $TEMP4 2008                  # Store found index in result location
-2017 SET 2050 $PC                     # Exit search immediately
-
-# Continue to next element
-2040 ADD $TEMP4 1                     # Increment counter/index
-2041 SYSCALL YIELD                    # Yield CPU for cooperative scheduling
-2042 SET 2005 $PC                     # Continue search loop
-
-# Print result
-2050 CPYI 2008 $PARAM1                # Get search result using indirect copy
-2051 SYSCALL PRN $PARAM1              # Print result (index if found, -1 if not found)
-2052 SYSCALL HLT                      # Thread complete
 
 
 
@@ -934,7 +894,6 @@ Begin Instruction Section
 3050 CPYI 3008 $PARAM1                # Get search result using indirect copy
 3051 SYSCALL PRN $PARAM1              # Print result (index if found, -1 if not found)
 3052 SYSCALL HLT                      # Thread complete
-
 
 
 End Instruction Section
