@@ -1,5 +1,6 @@
 # GTU-C312 Operating System with Macros - Complete Implementation
 # Register and Memory Layout Macros
+# gtu_os.asm
 .define $PC 0
 .define $SP 1
 .define $SYSCALL_RES 2
