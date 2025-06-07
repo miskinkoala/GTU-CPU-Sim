@@ -345,7 +345,6 @@ Begin Instruction Section
 127 ADD @SCHEDULER_COUNTER 1          # Increment scheduler counter
 128 SET 110 $PC                       # Loop back to start
 
-
 # All Threads Completed Handler (Instructions 180-189)
 180 SET SENTINEL_DEAD $TEMP1          # Load completion sentinel
 181 SYSCALL PRN $TEMP1                # Print completion marker
@@ -356,8 +355,6 @@ Begin Instruction Section
 190 SET SENTINEL_BEEF $TEMP1          # Load shutdown sentinel
 191 SYSCALL PRN $TEMP1                # Print shutdown marker
 192 HLT                               # Halt the system
-
-
 
 
 # THREAD_INACTIVE 0
@@ -669,23 +666,24 @@ Begin Instruction Section
 809 SET 806 $PC                       # Loop back to check
 
 # Calculate thread entry base address
-820 ADD $TEMP2 $TEMP4                 # base + offset = thread entry address
+820 ADDI $TEMP2 $TEMP4                 # base + offset = thread entry address
+
 
 # Load CPU registers from thread table
 821 CPY $TEMP2 $STORE2                # Save thread entry base address
 822 ADD $STORE2 4                     # Move to PC field (offset 4)
 823 CPYI $STORE2 $TEMP5               # Get stored PC value
-824 SET $TEMP5 $PC                    # Restore PC
+824 CPY $TEMP5 $PC                    # Restore PC
 
 825 CPY $TEMP2 $STORE2                # Restore thread entry base
 826 ADD $STORE2 5                     # Move to SP field (offset 5)
 827 CPYI $STORE2 $TEMP5               # Get stored SP value
-828 SET $TEMP5 $SP                    # Restore SP
+828 CPY $TEMP5 $SP                    # Restore SP
 
 829 CPY $TEMP2 $STORE2                # Restore thread entry base
 830 ADD $STORE2 6                     # Move to FP field (offset 6)
 831 CPYI $STORE2 $TEMP5               # Get stored FP value
-832 SET $TEMP5 $FP                    # Restore FP
+832 CPY $TEMP5 $FP                    # Restore FP
 
 # Load additional working registers if needed
 833 CPY $TEMP2 $STORE2                # Restore thread entry base

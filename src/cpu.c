@@ -1,5 +1,5 @@
 // TODO: CALL function does not work as intended
-#cpu.c
+// cpu.c
 // CUSTOM headers
 #include "cpu.h" //ISA, CPU, Memory arctectures
 // #include "common.h"
@@ -227,7 +227,7 @@ void changeMode()
 void execute_instruction()
 {
     INSTR_ADDR current_pc = CPU_PC(&gtu_cpu);
-    printf("PC: %ld", current_pc);
+    printf("PC: %ld -> ", current_pc);
 
     // Bounds check
     if (current_pc >= INST_MEMORY_CAPACITY)
@@ -740,8 +740,8 @@ void JIF(MEM_LOCATION A, INSTR_ADDR C)
     if (DATA_MEMORY[A]._sli <= 0)
     {
         CPU_PC(&gtu_cpu) = C;
-        printf("CPU_PC: %ld\n", CPU_PC(&gtu_cpu));
-        printf("C: %ld\n", C);
+        // printf("CPU_PC: %ld\n", CPU_PC(&gtu_cpu));
+        // printf("C: %ld\n", C);
 
         printf("JIF: Jump to %lu (condition met: MEMORY[%lu] = %ld <= 0)\n",
                C, A, DATA_MEMORY[A]._sli);
@@ -821,8 +821,8 @@ void CALL(INSTR_ADDR C)
 
     DATA_MEMORY[CPU_SP(&gtu_cpu)]._sli = return_addr;
     CPU_PC(&gtu_cpu) = C;
-    printf("CPU_PC: %ld\n", CPU_PC(&gtu_cpu));
-    printf("C: %ld\n", C);
+    // printf("CPU_PC: %ld\n", CPU_PC(&gtu_cpu));
+    // printf("C: %ld\n", C);
 
     printf("CALL: Subroutine at %lu called, return address %ld pushed\n", C, return_addr);
 }
@@ -880,7 +880,7 @@ void SYSCALL_PRN(MEM_LOCATION A)
     printf("%ld\n", DATA_MEMORY[A]._sli);
 
     // Block for 100 instruction executions (simulate I/O delay)
-    CPU_INSTR_COUNT(&gtu_cpu) += 100;
+    // CPU_INSTR_COUNT(&gtu_cpu) += 100;
 
     // Set success result
     CPU_SYSCALL_RES(&gtu_cpu) = 0;
@@ -890,21 +890,22 @@ void SYSCALL_PRN(MEM_LOCATION A)
 
 void SYSCALL_HLT()
 {
-    // Switch to kernel mode
-    gtu_cpu.mode.mode = 'K';
+    // Set syscall result to indicate HLT was called
+    CPU_SYSCALL_RES(&gtu_cpu) = 3;
 
-    printf("SYSCALL HLT: Thread shutdown requested\n");
-    gtu_cpu.halted = 1;
-    CPU_SYSCALL_RES(&gtu_cpu) = 0;
+    printf("SYSCALL HLT: Thread terminating\n");
+
+    // In a real implementation, this would mark thread as inactive
+    // For simulation, we just mark that a halt occurred
 }
 
 void SYSCALL_YIELD()
 {
-    // Switch to kernel mode
-    gtu_cpu.mode.mode = 'K';
+    // Set syscall result to indicate YIELD was called
+    CPU_SYSCALL_RES(&gtu_cpu) = 2;
 
     printf("SYSCALL YIELD: Thread yielding CPU\n");
-    // In a real OS, this would trigger scheduler
-    // For now, just indicate successful yield
-    CPU_SYSCALL_RES(&gtu_cpu) = 0;
+
+    // In a real implementation, this would trigger context switching
+    // For simulation, we just mark that a yield occurred
 }

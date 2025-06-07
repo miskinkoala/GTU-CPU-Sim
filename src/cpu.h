@@ -88,6 +88,9 @@ void print_memory_state(void);
 void print_thread_table(void);
 
 extern int debug_mode; // Declare debug_mode as extern
+// Add function prototypes for debug functions
+void print_memory_to_stderr(void);
+void print_thread_table_to_stderr(void);
 
 /*
 CPU FUNTIONALTTIES
