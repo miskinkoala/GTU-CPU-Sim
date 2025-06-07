@@ -314,8 +314,8 @@ int can_access_memory(MEM_LOCATION addr)
         return is_valid_memory_address(addr); // Kernel can access all valid memory
     }
     else
-    {                                                           // User mode
-        return (addr >= 1000 && is_valid_memory_address(addr)); // User can only access 1000+
+    {                                                                                          // User mode
+        return (((addr >= 0 && addr <= 20) || addr >= 1000) && is_valid_memory_address(addr)); // User can only access 1000+
     }
 }
 
@@ -883,8 +883,8 @@ void SYSCALL_PRN(MEM_LOCATION A)
     // CPU_INSTR_COUNT(&gtu_cpu) += 100;
 
     // Set success result
-    CPU_SYSCALL_RES(&gtu_cpu) = 0;
-
+    CPU_SYSCALL_RES(&gtu_cpu) = 1;
+    CPU_PC(&gtu_cpu) = 500;
     printf("SYSCALL PRN: Printed %ld, blocked for 100 instructions\n", DATA_MEMORY[A]._sli);
 }
 
@@ -892,7 +892,7 @@ void SYSCALL_HLT()
 {
     // Set syscall result to indicate HLT was called
     CPU_SYSCALL_RES(&gtu_cpu) = 3;
-
+    CPU_PC(&gtu_cpu) = 500;
     printf("SYSCALL HLT: Thread terminating\n");
 
     // In a real implementation, this would mark thread as inactive
@@ -903,6 +903,7 @@ void SYSCALL_YIELD()
 {
     // Set syscall result to indicate YIELD was called
     CPU_SYSCALL_RES(&gtu_cpu) = 2;
+    CPU_PC(&gtu_cpu) = 500;
 
     printf("SYSCALL YIELD: Thread yielding CPU\n");
 

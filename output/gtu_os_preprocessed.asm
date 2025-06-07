@@ -55,7 +55,7 @@ Begin Data Section
 
 
 # Offset 9:  UNBLOCK TIME
-#ID:1 starting time:2 how many execution:3 so far in the thread:4 state:5, PC:6, SP:7, FP:8,
+#ID:0 starting time:1 how many execution so far in the thread:2 status:3, PC:4, SP:5, FP:6, Res_R:7 15, Res_R:8 16  unblocking_time:9
 # Thread Table Structure (4 threads * 10 words each)
 # Thread 0 (OS itself)
 #######THREAD TABLE#######
@@ -208,18 +208,12 @@ Begin Data Section
 
 999 48879
 
-# Thread 1 Data Area (1000-1999) - Bubble Sort
-1000 0
-1001 5
-1002 64
-1003 34
-1004 25
-1005 12
-1006 90
-1007 0
-1008 0
-1009 0
-1010 0
+# Thread 1 Data Area (1000-1999) - Simple Counter
+1000 0                     # Thread start marker
+1001 10                              # Count from 1 to 10
+1002 0                               # Unused
+1003 0                               # Sum accumulator (initially 0)
+
 
 # Thread 2 Data Area (2000-2999) - Linear Search
 2000 0
@@ -272,7 +266,7 @@ Begin Instruction Section
 116 CPY 175 5 # Check thread completion
 117 CPY 174 6   # Load active thread count
 118 CPY 5 7                 # Copy completed count
-119 ADD 7 -3                     # Check if all threads done
+119 ADD 7 -2                     # Check if all threads done CHANGED FROM 3 to 2 !!
 120 JIF 7 125                    # Jump to completion handler
 121 SET 180 0                       # If OS_state >= 2, shutdown
 
@@ -346,12 +340,11 @@ Begin Instruction Section
 388 JIF 7 392                    # Continue if thread_ID <= 3
 389 SET 1 16                      # Wrap to thread 1
 
+390 CPY 15 14                   # Restore frame pointer
+391 RET                             # Return
+                             
 392 ADD 17 1                      # Increment counter
 393 SET 354 0                       # Continue loop
-
-390 CPY 15 14                   # Restore frame pointer
-391 RET                               # Return
-
 
 
 
@@ -366,7 +359,7 @@ Begin Instruction Section
 404 CPY 16 4                # Check if thread > 3
 405 ADD 4 -3                     # temp1 = thread_ID - 3
 406 JIF 4 408                    # If thread_ID <= 3, continue
-407 SET 1 16                     # If thread_ID > 3, wrap to 1
+407 SET 1 16                     # If thread_ID > 3, wrap to 1 TODO: 3 BLOCK CONDITION
 
 408 SET 0 17                     # ✅ Use STORE3 for search counter (persistent)
 
@@ -390,7 +383,7 @@ Begin Instruction Section
 # Second equality check: 1 - state
 420 SET 1 5                      # Load constant 1
 421 SUBI 18 5               # temp2 = 1 - state
-422 JIF 5 425                    # If 1 - state <= 0 (state >= 1)
+422 JIF 5 425                    # If 1 - state <= 0 (state >= 1) = ! READY
 423 SET 440 0                       # If state < 1, try next thread
 
 # Both conditions met: state == 1 (READY)
@@ -445,10 +438,12 @@ Begin Instruction Section
 522 ADD 5 9                      # Move to reserved area (offset 9) for unblock time
 523 CPY 3 6           # Get current instruction count
 524 ADD 6 100                    # Add 100 instructions
-525 SET 6 5                 # Store unblock time
+525 CPY 6 750
 
-526 SET 1 26        # Force context switch
-527 SET 550 0                       # Return
+526 CPY 750 5                # ✅ CORRECT: Store 6 value at address 5
+
+527 SET 1 26        # Force context switch
+528 SET 550 0                       # Return
 
 
 # Handle YIELD system call
@@ -509,7 +504,7 @@ Begin Instruction Section
 
 # Get current thread ID and validate
 702 CPY 23 16       # Get current thread ID
-703 JIF 16 720                   # If current thread = 0 (OS), skip saving
+703 JIF 16 720                   # If current thread = 0 (OS), skip saving OS NOT SAVED PROBLEM
 
 # Save current thread context
 704 CPY 16 10               # Pass current thread ID
@@ -524,130 +519,120 @@ Begin Instruction Section
 722 CPY 17 10               # Pass new thread ID
 723 CALL 800                          # ✅ FIXED: Call correct load helper
 724 CPY 12 4                # Get thread table address result
-725 ADD 4 3                      # Move to state field
-726 SET 2 4         # Set new thread to RUNNING
+725 CPY 4 5                # Get thread table address result
+726 ADD 5 3                      # Move to state field
+727 SET 2 5         # Set new thread to RUNNING
+728 ADD 4 4
 
 # Switch to user mode and jump to new thread
-727 CPY 17 5                # Copy new thread ID
-728 JIF 5 740                    # If thread 0 (OS), stay in kernel
-729 CALL 850                           # Switch to user mode for user threads
-730 CPY 740 0                       # Jump to exit
+729 CPY 17 5                # Copy new thread ID
+730 JIF 5 740                    # If thread 0 (OS), stay in kernel
+731 USER 4                       # Switch to user mode and jump
 
-740 CPY 15 14                   # Restore frame pointer
-741 RET                               # Return
+740 RET
 
-# Save Thread State Helper (Instructions 750-799) - COMPLETELY FIXED
+
+# Save Thread State Helper (Instructions 750-799) - USING HELPER FUNCTION
 750 CPY 14 15                   # Save frame pointer
 751 CPY 1 14                       # Set new frame pointer
 752 CPY 10 4                # Get thread ID
 
-# Calculate thread table base address manually (thread_ID * 10)
-753 SET 40 5     # Get thread table base (40)
-754 CPY 4 6                 # Copy thread ID
-755 SET 0 7                      # Initialize offset
+# Use Get Thread Table Base Helper instead of manual calculation
+753 CPY 4 10                # Pass thread ID to helper
+754 CALL 650                          # Call Get Thread Table Base Helper
+755 CPY 12 4                # Get thread table base address
 
-# Multiplication loop: offset = thread_ID * 10
-756 JIF 6 770                    # If thread ID = 0, skip multiplication
-757 ADD 7 10      # Add 10 to offset
-758 ADD 6 -1                     # Decrement thread ID counter
-759 SET 756 0                       # Loop back to check
+# Save CPU registers to thread table following new layout
+# Offset 4: PC (Program Counter)
+756 CPY 4 5                 # Get thread table base address
+757 ADD 5 4                      # Move to PC field (offset 4)
+758 CPY 0 8                    # Get current PC
+759 SET 8 5                 # Store PC in thread table
 
-# Calculate thread entry base address
-770 ADD 5 7                 # base + offset = thread entry address
+# Offset 5: SP (Stack Pointer)
+760 CPY 4 5                 # Get fresh thread table base
+761 ADD 5 5                      # Move to SP field (offset 5)
+762 CPY 1 8                    # Get current SP
+763 SET 8 5                 # Store SP in thread table
 
-# Save CPU registers to thread table
-771 CPY 5 16                # Save thread entry base address
-772 ADD 16 4                     # Move to PC field (offset 4)
-773 CPY 0 8                    # Get current PC
-774 SET 8 16                # Store PC in thread table
+# Offset 6: FP (Frame Pointer)
+764 CPY 4 5                 # Get fresh thread table base
+765 ADD 5 6                      # Move to FP field (offset 6)
+766 CPY 14 8                    # Get current FP
+767 SET 8 5                 # Store FP in thread table
 
-775 CPY 5 16                # Restore thread entry base
-776 ADD 16 5                     # Move to SP field (offset 5)
-777 CPY 1 8                    # Get current SP
-778 SET 8 16                # Store SP in thread table
+# Offset 7: Reserved Register 1 (save 15)
+768 CPY 4 5                 # Get fresh thread table base
+769 ADD 5 7                      # Move to Res_R field (offset 7)
+770 CPY 15 8                # Get 15 value
+771 SET 8 5                 # Store Reserved Register 1
 
-779 CPY 5 16                # Restore thread entry base
-780 ADD 16 6                     # Move to FP field (offset 6)
-781 CPY 14 8                    # Get current FP
-782 SET 8 16                # Store FP in thread table
+# Offset 8: Reserved Register 2 (save 16)
+772 CPY 4 5                 # Get fresh thread table base
+773 ADD 5 8                      # Move to Res_R field (offset 8)
+774 CPY 16 8                # Get 16 value
+775 SET 8 5                 # Store Reserved Register 2
 
-# Save additional working registers if needed
-783 CPY 5 16                # Restore thread entry base
-784 ADD 16 7                     # Move to saved register area (offset 7)
-785 CPY 4 8                 # Save TEMP1 (thread ID)
-786 SET 8 16                # Store in thread table
+# Note: Offset 9 (unblocking_time) is managed by OS for SYSCALL PRN blocking
 
-787 ADD 16 1                     # Move to next save slot (offset 8)
-788 CPY 5 8                 # Save TEMP2 (base address)
-789 SET 8 16                # Store in thread table
-
-790 CPY 5 12                # Return thread table base address
-791 CPY 15 14                   # Restore frame pointer
-792 RET                               # Return
+776 CPY 4 12                # Return thread table base address
+777 CPY 15 14                   # Restore frame pointer
+778 RET                               # Return
 
 
-# Load Thread State Helper (Instructions 800-849) - COMPLETE
+
+# Load Thread State Helper (Instructions 800-849) - CORRECTED FOR NEW OFFSETS
 800 CPY 14 15                   # Save frame pointer
 801 CPY 1 14                       # Set new frame pointer
 802 CPY 10 4                # Get thread ID
 
-# Calculate thread table base address manually
-803 SET 40 5     # Get thread table base (40)
-804 CPY 4 6                 # Copy thread ID
-805 SET 0 7                      # Initialize offset
+# Use Get Thread Table Base Helper
+803 CPY 4 10                # Pass thread ID to helper
+804 CALL 650                          # Call Get Thread Table Base Helper
+805 CPY 12 4                # Get thread table base address
 
-# Multiplication loop: offset = thread_ID * 10
-806 JIF 6 820                    # If thread ID = 0, skip multiplication
-807 ADD 7 10      # Add 10 to offset
-808 ADD 6 -1                     # Decrement thread ID counter
-809 SET 806 0                       # Loop back to check
+# Restore SP FIRST (offset 5) ✅ CORRECT
+806 CPY 4 5                 # Get thread entry base address
+807 ADD 5 5                      # Move to SP field (offset 5)
+808 CPYI 5 8                # Get stored SP value
+809 CPY 8 1                    # Restore SP
 
-# Calculate thread entry base address
-820 ADDI 5 7                 # base + offset = thread entry address
+# Restore FP (offset 6) ✅ CORRECT
+810 CPY 4 5                 # Get fresh thread entry base
+811 ADD 5 6                      # Move to FP field (offset 6)
+812 CPYI 5 8                # Get stored FP value
+813 CPY 8 14                    # Restore FP
 
+# Load Reserved Register 1 from offset 7
+814 CPY 4 5                 # Get fresh thread entry base
+815 ADD 5 7                      # Move to Res_R field (offset 7)
+816 CPYI 5 8                # Get stored register value
+817 CPY 8 15                # Restore to 15 (or appropriate register)
 
-# Load CPU registers from thread table
-821 CPY 5 16                # Save thread entry base address
-822 ADD 16 4                     # Move to PC field (offset 4)
-823 CPYI 16 8               # Get stored PC value
-824 CPY 8 0                    # Restore PC
+# Load Reserved Register 2 from offset 8
+818 CPY 4 5                 # Get fresh thread entry base
+819 ADD 5 8                      # Move to Res_R field (offset 8)
+820 CPYI 5 8                # Get stored register value
+821 CPY 8 16                # Restore to 16 (or appropriate register)
 
-825 CPY 5 16                # Restore thread entry base
-826 ADD 16 5                     # Move to SP field (offset 5)
-827 CPYI 16 8               # Get stored SP value
-828 CPY 8 1                    # Restore SP
+822 CPY 4 5                 # Get fresh thread entry base
+823 ADD 5 3                      # Move to state field
+824 SET 2 5         # Set new thread to RUNNING
+825 CPY 4 5                 # Get fresh thread entry base
+826 ADD 5 4
 
-829 CPY 5 16                # Restore thread entry base
-830 ADD 16 6                     # Move to FP field (offset 6)
-831 CPYI 16 8               # Get stored FP value
-832 CPY 8 14                    # Restore FP
+# Switch to user mode and jump to new thread
+827 CPYI 4 4
+828 JIF 4 115                    # If thread 0 (OS), stay in kernel
+829 CPYI 5 5
+830 USER 5                       # Switch to user mode and jump
 
-# Load additional working registers if needed
-833 CPY 5 16                # Restore thread entry base
-834 ADD 16 7                     # Move to saved register area (offset 7)
-835 CPYI 16 4               # Restore TEMP1
-
-836 ADD 16 1                     # Move to next save slot (offset 8)
-837 CPYI 16 5               # Restore TEMP2
-
-838 CPY 5 12                # Return thread table base address
-839 CPY 15 14                   # Restore frame pointer
-840 RET                               # Return
-
-
+#ID:0 starting time:1 how many execution so far in the thread:2 status:3, PC:4, SP:5, FP:6, Res_R:7, Res_R:8  unblocking_time:9
 
 
 
-# Switch to User Mode Helper (Instructions 850-899)
-850 CPY 10 4                # Get thread ID
-851 SET 1000 5                   # Base user address
-852 CPY 4 6                 # Copy thread ID
-853 ADD 6 6                 # thread_ID * 2
-854 ADD 6 6                 # thread_ID * 4
-855 ADD 6 6                 # thread_ID * 8
-856 ADD 5 6                 # Approximate thread start address
-857 USER 5                       # Switch to user mode and jump
-858 RET                               # Return (should not reach here)
+
+
 
 
 
@@ -672,69 +657,38 @@ Begin Instruction Section
 910 RET                               # Return
 
 
-# Thread 1: Bubble Sort - FIXED FOR ARCHITECTURE
-1000 SET 1002 4        # Load array start address (1002)
-1001 CPY 1001 5                  # Load array size (5)
-1002 SET 0 6                     # Outer loop counter
 
-# Outer loop
-1003 CPY 6 7                # Copy outer counter
-1004 CPY 5 8                # Copy array size
-1005 ADD 8 -1                    # size - 1
-1006 SUBI 8 7               # temp4 = (size-1) - outer (keep SUBI as is)
-1007 JIF 7 1080                  # Exit if outer >= size-1
+# Thread 1: Simple Counter
+1000 CPY 1001 4        # Load maximum count (10)
+1001 SET 1 5                     # Initialize counter to 1
+1002 SET 0 1003                       # Initialize sum to 0
 
-1008 SET 0 9                     # Inner loop counter
+# Main counting loop
+1003 CPY 5 7                # Copy counter
+1004 CPY 4 8                # Copy max count  
+1005 SUBI 7 8               # temp5 = max_count - counter
+1006 JIF 8 1020                  # Exit if counter > max_count
 
-# Inner loop
-1009 CPY 9 15               # Copy inner counter
-1010 CPY 5 16               # Copy array size
-1011 ADD 16 -1                   # size - 1
-1012 CPY 6 17               # Copy outer counter
-1013 SUBI 16 17             # store2 = (size-1) - outer (keep SUBI as is)
-1014 SUBI 16 15             # store2 = (size-1-outer) - inner (keep SUBI as is)
-1015 JIF 16 1070                 # Exit inner if inner >= (size-1-outer)
+# Print current number
+1007 SYSCALL PRN 5               # Print current counter value
+1008 SYSCALL YIELD                    # Yield CPU for cooperative scheduling
 
-# Compare adjacent elements
-1016 CPY 4 17               # Copy array base
-1017 ADD 17 9               # Add inner counter
-1018 CPYI 17 10             # ✅ FIXED: Get arr[inner] using indirect copy
-1019 ADD 17 1                    # Move to next element
-1020 CPYI 17 11             # ✅ FIXED: Get arr[inner+1] using indirect copy
+# Add to sum
+1009 CPYI 1003 9                 # Load current sum
+1010 ADD 9 5                # Add counter to sum
+1011 SET 9 1003                  # Store sum back
 
-# Check if swap needed
-1021 CPY 10 12              # Copy first element
-1022 SUBI 11 12             # param3 = arr[inner] - arr[inner+1] (keep SUBI as is)
-1023 JIF 12 1060                 # If arr[inner] <= arr[inner+1], no swap
+# Increment counter and continue
+1012 ADD 5 1                     # Increment counter
+1013 SYSCALL YIELD                    # Yield CPU between iterations
+1014 SET 1003 0                     # Continue main loop
 
-# Swap elements
-1024 CPY 4 17               # Array base
-1025 ADD 17 9               # Add inner counter
-1026 SET 11 17              # Store arr[inner+1] in arr[inner]
-1027 ADD 17 1                    # Move to next
-1028 SET 10 17              # Store arr[inner] in arr[inner+1]
+# Print final sum
+1020 CPYI 1003 10                # Get final sum
+1021 SYSCALL PRN 10              # Print total sum (should be 55 for 1-10)
+1022 SYSCALL HLT                      # Thread complete
 
-1060 ADD 9 1                     # Increment inner counter
-1061 SYSCALL YIELD                    # ✅ Yield CPU for cooperative scheduling
-1062 SET 1009 0                     # Continue inner loop
 
-1070 ADD 6 1                     # Increment outer counter
-1071 SYSCALL YIELD                    # ✅ Yield CPU between outer loop iterations
-1072 SET 1003 0                     # Continue outer loop
-
-# Print sorted array
-1080 SET 0 6                     # Print counter
-1081 CPY 6 7                # Copy counter
-1082 ADD 7 -5                    # Check if printed all 5
-1083 JIF 7 1090                  # Exit if done
-1084 CPY 4 8                # Array base
-1085 ADD 8 6                # Add counter
-1086 CPYI 8 10              # ✅ FIXED: Get element using indirect copy
-1087 SYSCALL PRN 10              # ✅ FIXED: Print element value
-1088 ADD 6 1                     # Increment counter
-1089 SET 1081 0                     # Continue printing
-
-1090 SYSCALL HLT                      # Thread complete
 
 
 

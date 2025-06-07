@@ -272,18 +272,12 @@ $STORE4 0
 
 @KERNEL_END SENTINEL_BEEF
 
-# Thread 1 Data Area (1000-1999) - Bubble Sort
-@THREAD1_START 0
-1001 5
-1002 64
-1003 34
-1004 25
-1005 12
-1006 90
-1007 0
-1008 0
-1009 0
-1010 0
+# Thread 1 Data Area (1000-1999) - Simple Counter
+@THREAD1_START 0                     # Thread start marker
+1001 10                              # Count from 1 to 10
+1002 0                               # Unused
+1003 0                               # Sum accumulator (initially 0)
+
 
 # Thread 2 Data Area (2000-2999) - Linear Search
 @THREAD2_START 0
@@ -508,10 +502,12 @@ Begin Instruction Section
 522 ADD $TEMP2 9                      # Move to reserved area (offset 9) for unblock time
 523 CPY $INSTR_COUNT $TEMP3           # Get current instruction count
 524 ADD $TEMP3 100                    # Add 100 instructions
-525 SET $TEMP3 $TEMP2                 # Store unblock time
+525 CPY $TEMP3 750
 
-526 SET 1 @CONTEXT_SWITCH_FLAG        # Force context switch
-527 SET 550 $PC                       # Return
+526 CPY 750 $TEMP2                # ✅ CORRECT: Store $TEMP3 value at address $TEMP2
+
+527 SET 1 @CONTEXT_SWITCH_FLAG        # Force context switch
+528 SET 550 $PC                       # Return
 
 
 # Handle YIELD system call
@@ -524,8 +520,7 @@ Begin Instruction Section
 537 SET 550 $PC                       # Return
 
 550 SET 0 $SYSCALL_RES                # Clear system call result
-551 RET                               # Return
-
+551 SET 111 0
 
 # Get Thread State Helper (Instructions 600-699) - ADJUSTED FOR YOUR REGISTER LAYOUT
 600 CPY $PARAM1 $TEMP1                # Get thread ID
@@ -683,9 +678,17 @@ Begin Instruction Section
 820 CPYI $TEMP2 $TEMP5                # Get stored register value
 821 CPY $TEMP5 $STORE2                # Restore to $STORE2 (or appropriate register)
 
-822 CPY $TEMP1 $PARAM3                # Return thread table base address
-823 CPY $STORE1 $FP                   # Restore frame pointer
-824 RET
+822 CPY $TEMP1 $TEMP2                 # Get fresh thread entry base
+823 ADD $TEMP2 3                      # Move to state field
+824 SET THREAD_RUNNING $TEMP2         # Set new thread to RUNNING
+825 CPY $TEMP1 $TEMP2                 # Get fresh thread entry base
+826 ADD $TEMP2 4
+
+# Switch to user mode and jump to new thread
+827 CPYI $TEMP1 $TEMP1
+828 JIF $TEMP1 115                    # If thread 0 (OS), stay in kernel
+829 CPYI $TEMP2 $TEMP2
+830 USER $TEMP2                       # Switch to user mode and jump
 
 #ID:0 starting time:1 how many execution so far in the thread:2 status:3, PC:4, SP:5, FP:6, Res_R:7, Res_R:8  unblocking_time:9
 
@@ -717,69 +720,38 @@ Begin Instruction Section
 910 RET                               # Return
 
 
-# Thread 1: Bubble Sort - FIXED FOR ARCHITECTURE
-@THREAD1_START SET 1002 $TEMP1        # Load array start address (1002)
-1001 CPY 1001 $TEMP2                  # Load array size (5)
-1002 SET 0 $TEMP3                     # Outer loop counter
 
-# Outer loop
-1003 CPY $TEMP3 $TEMP4                # Copy outer counter
-1004 CPY $TEMP2 $TEMP5                # Copy array size
-1005 ADD $TEMP5 -1                    # size - 1
-1006 SUBI $TEMP5 $TEMP4               # temp4 = (size-1) - outer (keep SUBI as is)
-1007 JIF $TEMP4 1080                  # Exit if outer >= size-1
+# Thread 1: Simple Counter
+@THREAD1_START CPY 1001 $TEMP1        # Load maximum count (10)
+1001 SET 1 $TEMP2                     # Initialize counter to 1
+1002 SET 0 1003                       # Initialize sum to 0
 
-1008 SET 0 $TEMP6                     # Inner loop counter
+# Main counting loop
+1003 CPY $TEMP2 $TEMP4                # Copy counter
+1004 CPY $TEMP1 $TEMP5                # Copy max count  
+1005 SUBI $TEMP4 $TEMP5               # temp5 = max_count - counter
+1006 JIF $TEMP5 1020                  # Exit if counter > max_count
 
-# Inner loop
-1009 CPY $TEMP6 $STORE1               # Copy inner counter
-1010 CPY $TEMP2 $STORE2               # Copy array size
-1011 ADD $STORE2 -1                   # size - 1
-1012 CPY $TEMP3 $STORE3               # Copy outer counter
-1013 SUBI $STORE2 $STORE3             # store2 = (size-1) - outer (keep SUBI as is)
-1014 SUBI $STORE2 $STORE1             # store2 = (size-1-outer) - inner (keep SUBI as is)
-1015 JIF $STORE2 1070                 # Exit inner if inner >= (size-1-outer)
+# Print current number
+1007 SYSCALL PRN $TEMP2               # Print current counter value
+1008 SYSCALL YIELD                    # Yield CPU for cooperative scheduling
 
-# Compare adjacent elements
-1016 CPY $TEMP1 $STORE3               # Copy array base
-1017 ADD $STORE3 $TEMP6               # Add inner counter
-1018 CPYI $STORE3 $PARAM1             # ✅ FIXED: Get arr[inner] using indirect copy
-1019 ADD $STORE3 1                    # Move to next element
-1020 CPYI $STORE3 $PARAM2             # ✅ FIXED: Get arr[inner+1] using indirect copy
+# Add to sum
+1009 CPYI 1003 $TEMP6                 # Load current sum
+1010 ADD $TEMP6 $TEMP2                # Add counter to sum
+1011 SET $TEMP6 1003                  # Store sum back
 
-# Check if swap needed
-1021 CPY $PARAM1 $PARAM3              # Copy first element
-1022 SUBI $PARAM2 $PARAM3             # param3 = arr[inner] - arr[inner+1] (keep SUBI as is)
-1023 JIF $PARAM3 1060                 # If arr[inner] <= arr[inner+1], no swap
+# Increment counter and continue
+1012 ADD $TEMP2 1                     # Increment counter
+1013 SYSCALL YIELD                    # Yield CPU between iterations
+1014 SET 1003 $PC                     # Continue main loop
 
-# Swap elements
-1024 CPY $TEMP1 $STORE3               # Array base
-1025 ADD $STORE3 $TEMP6               # Add inner counter
-1026 SET $PARAM2 $STORE3              # Store arr[inner+1] in arr[inner]
-1027 ADD $STORE3 1                    # Move to next
-1028 SET $PARAM1 $STORE3              # Store arr[inner] in arr[inner+1]
+# Print final sum
+1020 CPYI 1003 $PARAM1                # Get final sum
+1021 SYSCALL PRN $PARAM1              # Print total sum (should be 55 for 1-10)
+1022 SYSCALL HLT                      # Thread complete
 
-1060 ADD $TEMP6 1                     # Increment inner counter
-1061 SYSCALL YIELD                    # ✅ Yield CPU for cooperative scheduling
-1062 SET 1009 $PC                     # Continue inner loop
 
-1070 ADD $TEMP3 1                     # Increment outer counter
-1071 SYSCALL YIELD                    # ✅ Yield CPU between outer loop iterations
-1072 SET 1003 $PC                     # Continue outer loop
-
-# Print sorted array
-1080 SET 0 $TEMP3                     # Print counter
-1081 CPY $TEMP3 $TEMP4                # Copy counter
-1082 ADD $TEMP4 -5                    # Check if printed all 5
-1083 JIF $TEMP4 1090                  # Exit if done
-1084 CPY $TEMP1 $TEMP5                # Array base
-1085 ADD $TEMP5 $TEMP3                # Add counter
-1086 CPYI $TEMP5 $PARAM1              # ✅ FIXED: Get element using indirect copy
-1087 SYSCALL PRN $PARAM1              # ✅ FIXED: Print element value
-1088 ADD $TEMP3 1                     # Increment counter
-1089 SET 1081 $PC                     # Continue printing
-
-1090 SYSCALL HLT                      # Thread complete
 
 
 
