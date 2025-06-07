@@ -365,29 +365,29 @@ Begin Instruction Section
 # Check Blocked Threads for Unblocking (Instructions 350-399) - USING ADD INSTEAD OF SUBI
 350 CPY $FP $STORE1                   # Save frame pointer
 351 CPY $SP $FP                       # Set new frame pointer
-352 SET 1 $TEMP1                      # Start with thread 1
-353 SET 0 $TEMP2                      # Thread counter
+352 SET 1 $STORE2                      # Start with thread 1
+353 SET 0 $STORE3                      # Thread counter
 
 # Loop through threads 1-3
-354 CPY $TEMP2 $TEMP3                 # Copy counter
+354 CPY $STORE3 $TEMP3                 # Copy counter
 355 ADD $TEMP3 -3                     # ✅ FIXED: temp3 = counter - 3
 356 JIF $TEMP3 358                    # Continue if counter <= 3
 357 SET 390 $PC                       # Exit if counter > 3
  
 # Check if thread is blocked
-358 CPY $TEMP1 $PARAM1                # Pass thread ID
+358 CPY $STORE2 $PARAM1                # Pass thread ID
 359 CALL 600                          # Get thread state
 360 CPY $PARAM3 $TEMP4                # Get state
 361 ADD $TEMP4 -2                     # ✅ FIXED: temp4 = state - 
-362 JIF $TEMP4 365                    # Continue if state > 2 = BLOCKED
-363 SET 385 $PC                       # Process blocked thread
+362 JIF $TEMP4 385                    # Continue if state > 2 = BLOCKED
+363 SET 365 $PC                       # Process blocked thread
 
 # Get thread table entry for blocked thread
-365 CPY $TEMP1 $PARAM1                # Pass thread ID
+365 CPY $STORE2 $PARAM1                # Pass thread ID
 366 CALL 650                          # Get thread table base
 367 CPY $PARAM3 $TEMP5                # Get thread table base
 
-368 ADD $TEMP5 9                      # Move to block type field
+368 ADD $TEMP5 9                      # Move to unblock time
 369 CPYI $TEMP5 $TEMP6                # unbock time
 
 # Check if 100 instructions have passed (offset 8)
@@ -401,20 +401,20 @@ Begin Instruction Section
 382 CPY $PARAM3 $STORE2               # Get thread table base
 383 ADD $STORE2 3                     # Move to state field
 384 SET THREAD_READY $STORE2          # Set thread back to READY
+#TODO may reset unblock time
 
 # Try next thread
-385 ADD $TEMP1 1                      # Increment thread ID
-386 CPY $TEMP1 $TEMP4                 # Copy thread ID
+385 ADD $STORE2 1                      # Increment thread ID
+386 CPY $STORE2 $TEMP4                 # Copy thread ID
 387 ADD $TEMP4 -3                     # ✅ FIXED: temp4 = thread_ID - 3
 388 JIF $TEMP4 392                    # Continue if thread_ID <= 3
-389 SET 1 $TEMP1                      # Wrap to thread 1
-
-392 ADD $TEMP2 1                      # Increment counter
-393 SET 354 $PC                       # Continue loop
+389 SET 1 $STORE2                      # Wrap to thread 1
 
 390 CPY $STORE1 $FP                   # Restore frame pointer
-391 RET                               # Return
-
+391 RET                             # Return
+                             
+392 ADD $STORE3 1                      # Increment counter
+393 SET 354 $PC                       # Continue loop
 
 
 
@@ -558,7 +558,7 @@ Begin Instruction Section
 656 ADD $TEMP3 -1                     # Decrement thread ID counter
 657 SET 654 $PC                       # Loop back to check
 
-670 ADD $TEMP2 $TEMP4                 # Calculate thread entry base address
+670 ADDI $TEMP2 $TEMP4                 # Calculate thread entry base address
 671 CPY $TEMP2 $PARAM3                # Return base address in PARAM3
 672 RET                               # Return
 

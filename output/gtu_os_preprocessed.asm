@@ -301,29 +301,29 @@ Begin Instruction Section
 # Check Blocked Threads for Unblocking (Instructions 350-399) - USING ADD INSTEAD OF SUBI
 350 CPY 14 15                   # Save frame pointer
 351 CPY 1 14                       # Set new frame pointer
-352 SET 1 4                      # Start with thread 1
-353 SET 0 5                      # Thread counter
+352 SET 1 16                      # Start with thread 1
+353 SET 0 17                      # Thread counter
 
 # Loop through threads 1-3
-354 CPY 5 6                 # Copy counter
+354 CPY 17 6                 # Copy counter
 355 ADD 6 -3                     # ✅ FIXED: temp3 = counter - 3
 356 JIF 6 358                    # Continue if counter <= 3
 357 SET 390 0                       # Exit if counter > 3
  
 # Check if thread is blocked
-358 CPY 4 10                # Pass thread ID
+358 CPY 16 10                # Pass thread ID
 359 CALL 600                          # Get thread state
 360 CPY 12 7                # Get state
 361 ADD 7 -2                     # ✅ FIXED: temp4 = state - 
-362 JIF 7 365                    # Continue if state > 2 = BLOCKED
-363 SET 385 0                       # Process blocked thread
+362 JIF 7 385                    # Continue if state > 2 = BLOCKED
+363 SET 365 0                       # Process blocked thread
 
 # Get thread table entry for blocked thread
-365 CPY 4 10                # Pass thread ID
+365 CPY 16 10                # Pass thread ID
 366 CALL 650                          # Get thread table base
 367 CPY 12 8                # Get thread table base
 
-368 ADD 8 9                      # Move to block type field
+368 ADD 8 9                      # Move to unblock time
 369 CPYI 8 9                # unbock time
 
 # Check if 100 instructions have passed (offset 8)
@@ -337,15 +337,16 @@ Begin Instruction Section
 382 CPY 12 16               # Get thread table base
 383 ADD 16 3                     # Move to state field
 384 SET 1 16          # Set thread back to READY
+#TODO may reset unblock time
 
 # Try next thread
-385 ADD 4 1                      # Increment thread ID
-386 CPY 4 7                 # Copy thread ID
+385 ADD 16 1                      # Increment thread ID
+386 CPY 16 7                 # Copy thread ID
 387 ADD 7 -3                     # ✅ FIXED: temp4 = thread_ID - 3
 388 JIF 7 392                    # Continue if thread_ID <= 3
-389 SET 1 4                      # Wrap to thread 1
+389 SET 1 16                      # Wrap to thread 1
 
-392 ADD 5 1                      # Increment counter
+392 ADD 17 1                      # Increment counter
 393 SET 354 0                       # Continue loop
 
 390 CPY 15 14                   # Restore frame pointer
@@ -494,7 +495,7 @@ Begin Instruction Section
 656 ADD 6 -1                     # Decrement thread ID counter
 657 SET 654 0                       # Loop back to check
 
-670 ADD 5 7                 # Calculate thread entry base address
+670 ADDI 5 7                 # Calculate thread entry base address
 671 CPY 5 12                # Return base address in PARAM3
 672 RET                               # Return
 
@@ -609,17 +610,17 @@ Begin Instruction Section
 821 CPY 5 16                # Save thread entry base address
 822 ADD 16 4                     # Move to PC field (offset 4)
 823 CPYI 16 8               # Get stored PC value
-824 SET 8 0                    # Restore PC
+824 CPY 8 0                    # Restore PC
 
 825 CPY 5 16                # Restore thread entry base
 826 ADD 16 5                     # Move to SP field (offset 5)
 827 CPYI 16 8               # Get stored SP value
-828 SET 8 1                    # Restore SP
+828 CPY 8 1                    # Restore SP
 
 829 CPY 5 16                # Restore thread entry base
 830 ADD 16 6                     # Move to FP field (offset 6)
 831 CPYI 16 8               # Get stored FP value
-832 SET 8 14                    # Restore FP
+832 CPY 8 14                    # Restore FP
 
 # Load additional working registers if needed
 833 CPY 5 16                # Restore thread entry base

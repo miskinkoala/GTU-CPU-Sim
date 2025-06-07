@@ -494,7 +494,7 @@ Begin Instruction Section
 656 ADD 6 -1                     # Decrement thread ID counter
 657 SET 654 0                       # Loop back to check
 
-670 ADD 5 7                 # Calculate thread entry base address
+670 ADDI 5 7                 # Calculate thread entry base address
 671 CPY 5 12                # Return base address in PARAM3
 672 RET                               # Return
 
@@ -602,23 +602,24 @@ Begin Instruction Section
 809 SET 806 0                       # Loop back to check
 
 # Calculate thread entry base address
-820 ADD 5 7                 # base + offset = thread entry address
+820 ADDI 5 7                 # base + offset = thread entry address
+
 
 # Load CPU registers from thread table
 821 CPY 5 16                # Save thread entry base address
 822 ADD 16 4                     # Move to PC field (offset 4)
 823 CPYI 16 8               # Get stored PC value
-824 SET 8 0                    # Restore PC
+824 CPY 8 0                    # Restore PC
 
 825 CPY 5 16                # Restore thread entry base
 826 ADD 16 5                     # Move to SP field (offset 5)
 827 CPYI 16 8               # Get stored SP value
-828 SET 8 1                    # Restore SP
+828 CPY 8 1                    # Restore SP
 
 829 CPY 5 16                # Restore thread entry base
 830 ADD 16 6                     # Move to FP field (offset 6)
 831 CPYI 16 8               # Get stored FP value
-832 SET 8 14                    # Restore FP
+832 CPY 8 14                    # Restore FP
 
 # Load additional working registers if needed
 833 CPY 5 16                # Restore thread entry base

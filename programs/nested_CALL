@@ -1,0 +1,28 @@
+# Test nested subroutine calls
+Begin Data Section
+0 100          # PC starts at 100
+1 1000         # SP starts at 1000
+End Data Section
+
+Begin Instruction Section
+100 SET 42 500     # Store test value
+101 CALL 200       # Call subroutine A
+102 SYSCALL PRN 500 # Print result
+103 HLT
+
+# Subroutine A
+200 SET 10 501     # Local variable
+201 CALL 300       # Call subroutine B (nested call)
+202 ADD 500 1      # Modify result
+203 RET            # Return to main
+
+# Subroutine B  
+300 SET 20 502     # Local variable
+301 CALL 400       # Call subroutine C (deeper nesting)
+302 ADD 500 2      # Modify result
+303 RET            # Return to A
+
+# Subroutine C
+400 ADD 500 100    # Modify the original value (42 + 100 = 142)
+401 RET            # Return to B
+End Instruction Section
