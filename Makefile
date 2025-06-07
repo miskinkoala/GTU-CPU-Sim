@@ -6,6 +6,7 @@ CFLAGS = -Wall -Wextra -std=c99 -g
 SRC_DIR = src
 TOOLS_DIR = tools
 PROGRAMS_DIR = programs
+OUTPUT = output
 
 # Targets
 SIMULATOR = $(SRC_DIR)/simulator
@@ -37,8 +38,8 @@ test: all
 
 # Run OS simulation
 run-os: all
-	./$(PREPROCESSOR) $(PROGRAMS_DIR)/os_with_threads.asm $(PROGRAMS_DIR)/os_preprocessed.asm -v
-	./$(SIMULATOR) $(PROGRAMS_DIR)/os_preprocessed.asm -D 3
+	./$(PREPROCESSOR) $(PROGRAMS_DIR)/gtu_os.asm $(OUTPUT)/gtu_os_preprocessed -v
+	./$(SIMULATOR) $(OUTPUT)/gtu_os_preprocessed.asm -D 3
 
 # Debug modes
 debug-0: all
