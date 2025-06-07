@@ -141,7 +141,7 @@ $STORE4 0
 50 1                                  # Thread ID: 1
 51 0                                  # Starting time: 0 (will be set by OS)
 52 0                                  # Instructions used: 0
-53 THREAD_BLOCKED                       # State: READY (1)
+53 THREAD_READY                       # State: READY (1)
 54 @THREAD1_START                     # PC: 1000 (thread start address)
 55 @THREAD1_END                       # SP: 1999 (thread stack top)
 56 @THREAD1_END                       # FP: 1999 (thread frame pointer)
@@ -153,7 +153,7 @@ $STORE4 0
 60 2                                  # Thread ID: 2
 61 0                                  # Starting time: 0 (will be set by OS)
 62 0                                  # Instructions used: 0
-63 THREAD_INACTIVE                       # State: READY (1)
+63 THREAD_READY                       # State: READY (1)
 64 @THREAD2_START                     # PC: 2000 (thread start address)
 65 @THREAD2_END                       # SP: 2999 (thread stack top)
 66 @THREAD2_END                       # FP: 2999 (thread frame pointer)
@@ -165,7 +165,7 @@ $STORE4 0
 70 3                                  # Thread ID: 3
 71 0                                  # Starting time: 0 (will be set by OS)
 72 0                                  # Instructions used: 0
-73 THREAD_INACTIVE                       # State: READY (1)
+73 THREAD_READY                       # State: READY (1)
 74 @THREAD3_START                     # PC: 3000 (thread start address)
 75 @THREAD3_END                       # SP: 3999 (thread stack top)
 76 @THREAD3_END                       # FP: 3999 (thread frame pointer)
@@ -271,7 +271,7 @@ $STORE4 0
 172 0
 173 0
 @ACTIVE_THREAD_COUNT 4
-@COMPLETED_THREAD_COUNT 1
+@COMPLETED_THREAD_COUNT 0
 
 @KERNEL_END SENTINEL_BEEF
 
@@ -326,7 +326,7 @@ Begin Instruction Section
 104 SET 0 @CONTEXT_SWITCH_FLAG        # Initialize context switch flag
 
 106 SET 4 @ACTIVE_THREAD_COUNT        # Set active thread count (threads 1-4)
-107 SET 2 @COMPLETED_THREAD_COUNT     # Initialize completed thread count ONE USER THREAD NOT READY SO THAT I start from 1
+107 SET 0 @COMPLETED_THREAD_COUNT     # Initialize completed thread count ONE USER THREAD NOT READY SO THAT I start from 1
 108 SET 110 $PC                       # Jump to main OS loop
 
 #OS state == 2 (shutdown) inti:0,running:1,shutdown:2
