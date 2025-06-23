@@ -24,9 +24,9 @@ void print_memory_to_stderr() {
 
 void print_thread_table_to_stderr() {
     fprintf(stderr, "\n=== THREAD TABLE CONTENTS ===\n");
-    fprintf(stderr, "Current Thread: %ld\n", DATA_MEMORY[19]._sli);  // @CURRENT_THREAD
-    fprintf(stderr, "Active Threads: %ld\n", DATA_MEMORY[22]._sli);  // @ACTIVE_THREAD_COUNT
-    fprintf(stderr, "Completed: %ld\n", DATA_MEMORY[23]._sli);       // @COMPLETED_THREAD_COUNT
+    fprintf(stderr, "Current Thread: %ld\n", DATA_MEMORY[23]._sli);  // @CURRENT_THREAD
+    fprintf(stderr, "Active Threads: %ld\n", DATA_MEMORY[174]._sli);  // @ACTIVE_THREAD_COUNT
+    fprintf(stderr, "Completed: %ld\n", DATA_MEMORY[175]._sli);       // @COMPLETED_THREAD_COUNT
     
     // Print thread table entries (starting at address 40)
     int thread_table_base = 40;

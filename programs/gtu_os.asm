@@ -399,7 +399,7 @@ Begin Instruction Section
 372 CPY $INSTR_COUNT $STORE2          # Get thread table base again
 373 CPY $TEMP6 $STORE3                # Move to unblock time field
 374 SUBI $STORE3 $STORE2              # store2 = current_time - unblock_time
-375 JIF $STORE2 387                   # If unblock_time >= current_time, block remain
+375 JIF $STORE2 388                   # If unblock_time >= current_time, block remain
 376 SET 382 $PC                       # unblock, try next
 
 # Unblock the thread
@@ -409,20 +409,22 @@ Begin Instruction Section
 384 SET 751 $TEMP5                      # Move to state field
 385 SET THREAD_READY 751
 386 CPYI2 $TEMP5 $STORE2
+387 CPYI2 $zero $TEMP5
+
 #TODO may reset unblock time
 
 # Try next thread
-387 ADD $STORE2 1                      # Increment thread ID
-388 CPY $STORE2 $TEMP4                 # Copy thread ID
-389 ADD $TEMP4 -3                     # ✅ FIXED: temp4 = thread_ID - 3
-390 JIF $TEMP4 392                    # Continue if thread_ID <= 3
-391 SET 1 $STORE2                      # Wrap to thread 1
+388 ADD $STORE2 1                      # Increment thread ID
+389 CPY $STORE2 $TEMP4                 # Copy thread ID
+390 ADD $TEMP4 -3                     # ✅ FIXED: temp4 = thread_ID - 3
+391 JIF $TEMP4 392                    # Continue if thread_ID <= 3
+392 SET 1 $STORE2                      # Wrap to thread 1
 
-392 CPY $STORE1 $FP                   # Restore frame pointer
-393 RET                             # Return
+393 CPY $STORE1 $FP                   # Restore frame pointer
+394 RET                             # Return
                              
-394 ADD $STORE3 1                      # Increment counter
-395 SET 354 $PC                       # Continue loop
+395 ADD $STORE3 1                      # Increment counter
+396 SET 354 $PC                       # Continue loop
 
 
 

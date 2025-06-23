@@ -77,7 +77,7 @@ Begin Data Section
 50 1                                  # Thread ID: 1
 51 0                                  # Starting time: 0 (will be set by OS)
 52 0                                  # Instructions used: 0
-53 3                       # State: READY (1)
+53 1                       # State: READY (1)
 54 1000                     # PC: 1000 (thread start address)
 55 1999                       # SP: 1999 (thread stack top)
 56 1999                       # FP: 1999 (thread frame pointer)
@@ -89,7 +89,7 @@ Begin Data Section
 60 2                                  # Thread ID: 2
 61 0                                  # Starting time: 0 (will be set by OS)
 62 0                                  # Instructions used: 0
-63 0                       # State: READY (1)
+63 1                       # State: READY (1)
 64 2000                     # PC: 2000 (thread start address)
 65 2999                       # SP: 2999 (thread stack top)
 66 2999                       # FP: 2999 (thread frame pointer)
@@ -101,7 +101,7 @@ Begin Data Section
 70 3                                  # Thread ID: 3
 71 0                                  # Starting time: 0 (will be set by OS)
 72 0                                  # Instructions used: 0
-73 0                       # State: READY (1)
+73 1                       # State: READY (1)
 74 3000                     # PC: 3000 (thread start address)
 75 3999                       # SP: 3999 (thread stack top)
 76 3999                       # FP: 3999 (thread frame pointer)
@@ -207,7 +207,7 @@ Begin Data Section
 172 0
 173 0
 174 4
-175 1
+175 0
 
 999 48879
 
@@ -262,7 +262,7 @@ Begin Instruction Section
 104 SET 0 26        # Initialize context switch flag
 
 106 SET 4 174        # Set active thread count (threads 1-4)
-107 SET 2 175     # Initialize completed thread count ONE USER THREAD NOT READY SO THAT I start from 1
+107 SET 0 175     # Initialize completed thread count ONE USER THREAD NOT READY SO THAT I start from 1
 108 SET 110 0                       # Jump to main OS loop
 
 #OS state == 2 (shutdown) inti:0,running:1,shutdown:2
@@ -335,7 +335,7 @@ Begin Instruction Section
 372 CPY 3 16          # Get thread table base again
 373 CPY 9 17                # Move to unblock time field
 374 SUBI 17 16              # store2 = current_time - unblock_time
-375 JIF 16 387                   # If unblock_time >= current_time, block remain
+375 JIF 16 388                   # If unblock_time >= current_time, block remain
 376 SET 382 0                       # unblock, try next
 
 # Unblock the thread
@@ -345,20 +345,22 @@ Begin Instruction Section
 384 SET 751 8                      # Move to state field
 385 SET 1 751
 386 CPYI2 8 16
+387 CPYI2 $zero 8
+
 #TODO may reset unblock time
 
 # Try next thread
-387 ADD 16 1                      # Increment thread ID
-388 CPY 16 7                 # Copy thread ID
-389 ADD 7 -3                     # ✅ FIXED: temp4 = thread_ID - 3
-390 JIF 7 392                    # Continue if thread_ID <= 3
-391 SET 1 16                      # Wrap to thread 1
+388 ADD 16 1                      # Increment thread ID
+389 CPY 16 7                 # Copy thread ID
+390 ADD 7 -3                     # ✅ FIXED: temp4 = thread_ID - 3
+391 JIF 7 392                    # Continue if thread_ID <= 3
+392 SET 1 16                      # Wrap to thread 1
 
-392 CPY 15 14                   # Restore frame pointer
-393 RET                             # Return
+393 CPY 15 14                   # Restore frame pointer
+394 RET                             # Return
                              
-394 ADD 17 1                      # Increment counter
-395 SET 354 0                       # Continue loop
+395 ADD 17 1                      # Increment counter
+396 SET 354 0                       # Continue loop
 
 
 

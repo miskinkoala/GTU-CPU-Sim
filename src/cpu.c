@@ -891,6 +891,8 @@ void SYSCALL_PRN(MEM_LOCATION A)
 void SYSCALL_HLT()
 {
     // Set syscall result to indicate HLT was called
+    gtu_cpu.mode.mode = 'K';
+
     CPU_SYSCALL_RES(&gtu_cpu) = 3;
     CPU_PC(&gtu_cpu) = 500;
     printf("SYSCALL HLT: Thread terminating\n");
@@ -902,6 +904,8 @@ void SYSCALL_HLT()
 void SYSCALL_YIELD()
 {
     // Set syscall result to indicate YIELD was called
+    gtu_cpu.mode.mode = 'K';
+
     CPU_SYSCALL_RES(&gtu_cpu) = 2;
     CPU_PC(&gtu_cpu) = 500;
 
