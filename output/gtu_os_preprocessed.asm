@@ -345,7 +345,7 @@ Begin Instruction Section
 384 SET 751 8                      # Move to state field
 385 SET 1 751
 386 CPYI2 8 16
-387 CPYI2 $zero 8
+387 CPYI2 13 8
 
 #TODO may reset unblock time
 
@@ -694,6 +694,7 @@ Begin Instruction Section
 
 # Thread 1: Simple Counter
 1000 CPY 1001 4        # Load maximum count (10)
+1001 SYSCALL HLT                     
 1001 SET 1 5                     # Initialize counter to 1
 1002 SET 0 1003                       # Initialize sum to 0
 

@@ -409,7 +409,7 @@ Begin Instruction Section
 384 SET 751 $TEMP5                      # Move to state field
 385 SET THREAD_READY 751
 386 CPYI2 $TEMP5 $STORE2
-387 CPYI2 $zero $TEMP5
+387 CPYI2 $ZERO $TEMP5
 
 #TODO may reset unblock time
 
@@ -520,7 +520,6 @@ Begin Instruction Section
 524 ADD $TEMP3 100                    # Add 100 instructions
 
 525 CPY $TEMP3 750
-525 SET $TEMP3 750
 
 526 CPYI2 750 $TEMP2                # ✅ CORRECT: Store $TEMP3 value at address $TEMP2
 
@@ -758,6 +757,7 @@ Begin Instruction Section
 
 # Thread 1: Simple Counter
 @THREAD1_START CPY 1001 $TEMP1        # Load maximum count (10)
+1001 SYSCALL HLT                     
 1001 SET 1 $TEMP2                     # Initialize counter to 1
 1002 SET 0 1003                       # Initialize sum to 0
 
